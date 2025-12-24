@@ -12,30 +12,29 @@ use App\Http\Controllers\Admin\ScreenController;
 use App\Http\Controllers\Admin\MovieController;
 use App\Http\Controllers\Admin\SlotController;
 use App\Http\Controllers\Admin\ScreenSlotAssignmentController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Staff\ScanController;
+use App\Http\Controllers\Admin\StaffScreenAssignmentController;
+use App\Http\Controllers\Dashboard\StaffDashboardController;
 // ------------------
 // PUBLIC ROUTES
 // ------------------
 
-Route::get('/', fn() => view('welcome'));
+Route::get('/', function () {
+    return redirect()->route('login');
+});
 
-Route::get('/home', [HomeController::class, 'index'])
-    ->middleware('auth')
-    ->name('home');
 
 // ------------------
 // AUTH ROUTES
 // ------------------
 
-Route::middleware('guest')->group(function () {
+Route::get('/login', [LoginController::class, 'showLoginForm'])
+    ->middleware('redirect.logged')
+    ->name('login');
 
-    // Login
-    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+Route::post('/login', [LoginController::class, 'login']);
 
-    // Register
-    Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-    Route::post('/register', [RegisterController::class, 'register']);
-});
 
 // Logout
 Route::post('/logout', [LoginController::class, 'logout'])
@@ -45,8 +44,17 @@ Route::post('/logout', [LoginController::class, 'logout'])
 // ------------------
 // ADMIN PANEL
 // ------------------
+Route::middleware(['auth'])
+    ->get('/profile', [UserController::class, 'profile'])
+    ->name('profile.show');
 
-Route::prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'active.user'])->prefix('admin')->name('admin.')->group(function () {
+
+    Route::resource('users', UserController::class);
+    Route::post('users/toggle-status', [UserController::class, 'toggleStatus'])
+        ->name('users.toggle-status');
+
+
 
     // ------------------
     // Venues
@@ -70,6 +78,37 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::resource('movies', MovieController::class);
     Route::resource('ssa', ScreenSlotAssignmentController::class)->names('ssa');
 
-    
+
     Route::resource('slots', SlotController::class);
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('/staff/scan', [ScanController::class, 'index'])->name('staff.scan.index');
+    Route::post('/staff/scan', [ScanController::class, 'scan'])->name('staff.scan.store');
+});
+Route::middleware(['auth', 'active.user', 'role:admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::resource(
+            'staff-assignments',
+            StaffScreenAssignmentController::class
+        );
+    });
+
+Route::middleware(['auth'])->prefix('staff')->group(function () {
+    Route::get('/scan', [ScanController::class, 'index'])->name('staff.scan.index');
+    Route::post('/scan', [ScanController::class, 'scan'])->name('staff.scan.store');
+    Route::get('/scan/stats', [ScanController::class, 'stats'])->name('staff.scan.stats');
+});
+
+Route::middleware(['auth', 'role:staff'])->group(function () {
+    Route::get('/staff/dashboard', [StaffDashboardController::class, 'index'])
+        ->name('staff.dashboard');
+
+    Route::get('/staff/dashboard/export/excel', [StaffDashboardController::class, 'exportExcel'])
+        ->name('staff.dashboard.export.excel');
+
+    Route::get('/staff/dashboard/export/pdf', [StaffDashboardController::class, 'exportPdf'])
+        ->name('staff.dashboard.export.pdf');
 });

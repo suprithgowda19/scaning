@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::create('screen_slot_assignments', function (Blueprint $table) {
             $table->id();
 
-            // Core foreign keys
+            // ===============================
+            // CORE RELATIONSHIPS
+            // ===============================
             $table->foreignId('venue_id')
                 ->constrained()
                 ->cascadeOnDelete();
@@ -31,18 +33,28 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
-            // Festival day (1–7)
-            $table->unsignedTinyInteger('day'); // 1: Day1 ... 7: Day7
+            // ===============================
+            // FESTIVAL / SCREENING CONTEXT
+            // ===============================
+            // Day number (1–7)
+            $table->unsignedTinyInteger('day');
 
-            // Show status
+            // Runtime status controlled by admin
+            // IMPORTANT: default must be INACTIVE
             $table->enum('status', ['active', 'inactive'])
-                ->default('active');
+                ->default('inactive');
 
             $table->timestamps();
 
-            // Unique combination prevents double scheduling:
-            // Same screen cannot have 2 movies at the same slot on the same day.
-            $table->unique(['venue_id', 'screen_id', 'slot_id', 'day'], 'ssa_unique');
+            // ===============================
+            // HARD CONSTRAINTS
+            // ===============================
+            // Same screen cannot have two shows
+            // at the same slot on the same day
+            $table->unique(
+                ['screen_id', 'slot_id', 'day'],
+                'uniq_screen_day_slot'
+            );
         });
     }
 
