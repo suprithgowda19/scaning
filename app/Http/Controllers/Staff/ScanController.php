@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\DelegateForm;
 use App\Models\ScanLog;
-use App\Models\Screen;
+use App\Models\ScreenSlotAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,6 +13,10 @@ class ScanController extends Controller
 {
     /**
      * Scan dashboard page
+     * Shows:
+     * - Screen name
+     * - Active Day & Slot (from SSA)
+     * - Live stats (current show only)
      */
     public function index()
     {
@@ -21,18 +25,34 @@ class ScanController extends Controller
             abort(401);
         }
 
+        // Resolve staff → screen
         $screen = $staff->screens()->first();
         if (! $screen) {
             abort(403, 'Screen not assigned');
         }
 
-        // ===== READ-ONLY STATS (for Blade cards) =====
-        $entered = ScanLog::where('screen_id', $screen->id)->count();
+        // Resolve ACTIVE SSA (MANDATORY)
+        $activeSSA = ScreenSlotAssignment::with(['slot', 'movie'])
+            ->where('screen_id', $screen->id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $activeSSA) {
+            abort(403, 'No active show for this screen. Scanning disabled.');
+        }
+
+        // ===== STATS (CURRENT SHOW ONLY) =====
+        $entered = ScanLog::where('screen_id', $screen->id)
+            ->where('day', $activeSSA->day)
+            ->where('slot_id', $activeSSA->slot_id)
+            ->count();
 
         $categories = ScanLog::where('screen_id', $screen->id)
+            ->where('day', $activeSSA->day)
+            ->where('slot_id', $activeSSA->slot_id)
             ->select('category', DB::raw('COUNT(*) as count'))
             ->groupBy('category')
-            ->pluck('count', 'category')   // 🔑 KEY FIX
+            ->pluck('count', 'category')
             ->toArray();
 
         $stats = [
@@ -42,12 +62,15 @@ class ScanController extends Controller
             'categories' => $categories,
         ];
 
-        return view('staff.scan', compact('stats'));
+        return view('staff.scan', compact(
+            'screen',
+            'activeSSA',
+            'stats'
+        ));
     }
 
     /**
-     * Handle QR scan
-     * Accepts UUID or QR_COUNT
+     * Handle QR / UUID scan
      */
     public function scan(Request $request)
     {
@@ -63,6 +86,7 @@ class ScanController extends Controller
             ], 401);
         }
 
+        // Resolve staff → screen
         $screen = $staff->screens()->first();
         if (! $screen) {
             return response()->json([
@@ -71,9 +95,23 @@ class ScanController extends Controller
             ], 403);
         }
 
+        // Resolve ACTIVE SSA (GATE)
+        $activeSSA = ScreenSlotAssignment::where('screen_id', $screen->id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $activeSSA) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No active show for this screen. Scanning disabled.',
+            ], 403);
+        }
+
+        // Normalize scanner input
         $raw   = trim($request->uuid);
         $value = preg_replace('/^UUID:\s*/i', '', $raw);
 
+        // Resolve delegate
         $delegate = DelegateForm::where('uuid', $value)
             ->orWhere('qr_count', $value)
             ->first();
@@ -85,21 +123,27 @@ class ScanController extends Controller
             ]);
         }
 
+        // SSA-SCOPED duplicate check
         if (
-            ScanLog::where('delegate_form_id', $delegate->id)
+            ScanLog::where('uuid', $delegate->uuid)
                 ->where('screen_id', $screen->id)
+                ->where('day', $activeSSA->day)
+                ->where('slot_id', $activeSSA->slot_id)
                 ->exists()
         ) {
             return response()->json([
                 'status'  => 'duplicate',
-                'message' => 'Already scanned for this screen',
+                'message' => 'Already scanned for this show',
             ]);
         }
 
         try {
-            DB::transaction(function () use ($delegate, $screen, $staff) {
+            DB::transaction(function () use ($delegate, $screen, $activeSSA) {
 
+                // SSA-SCOPED capacity check
                 $currentCount = ScanLog::where('screen_id', $screen->id)
+                    ->where('day', $activeSSA->day)
+                    ->where('slot_id', $activeSSA->slot_id)
                     ->lockForUpdate()
                     ->count();
 
@@ -107,13 +151,20 @@ class ScanController extends Controller
                     throw new \RuntimeException('Screen capacity full');
                 }
 
+                // Persist scan (IMMUTABLE FACT)
                 ScanLog::create([
                     'delegate_form_id' => $delegate->id,
                     'uuid'             => $delegate->uuid,
                     'screen_id'        => $screen->id,
-                    'scanned_by'       => $staff->id,
+
+                    // 🔒 SSA SNAPSHOT
+                    'day'              => $activeSSA->day,
+                    'slot_id'          => $activeSSA->slot_id,
+
+                    // Snapshot fields
                     'form_no'          => $delegate->form_no,
                     'category'         => $delegate->category,
+
                     'status'           => 'valid',
                     'scanned_at'       => now(),
                 ]);
@@ -136,7 +187,7 @@ class ScanController extends Controller
     }
 
     /**
-     * Live stats (API)
+     * Live stats API (current show only)
      */
     public function stats()
     {
@@ -150,16 +201,31 @@ class ScanController extends Controller
             return response()->json([], 403);
         }
 
+        $activeSSA = ScreenSlotAssignment::where('screen_id', $screen->id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $activeSSA) {
+            return response()->json([], 403);
+        }
+
         return response()->json([
-            'total' => ScanLog::where('screen_id', $screen->id)->count(),
+            'total' => ScanLog::where('screen_id', $screen->id)
+                ->where('day', $activeSSA->day)
+                ->where('slot_id', $activeSSA->slot_id)
+                ->count(),
 
             'byCategory' => ScanLog::where('screen_id', $screen->id)
+                ->where('day', $activeSSA->day)
+                ->where('slot_id', $activeSSA->slot_id)
                 ->select('category', DB::raw('COUNT(*) as count'))
                 ->groupBy('category')
                 ->orderBy('category')
                 ->get(),
 
             'lastScan' => ScanLog::where('screen_id', $screen->id)
+                ->where('day', $activeSSA->day)
+                ->where('slot_id', $activeSSA->slot_id)
                 ->latest('scanned_at')
                 ->first(),
         ]);

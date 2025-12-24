@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ScreenSlotAssignment;
 use App\Models\Venue;
-use App\Models\Screen;
 use App\Models\Slot;
 use App\Models\Movie;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ScreenSlotAssignmentController extends Controller
@@ -36,13 +36,13 @@ class ScreenSlotAssignmentController extends Controller
         $venues = Venue::with('screens')->orderBy('name')->get();
         $movies = Movie::orderBy('title')->get();
         $slots  = Slot::orderBy('start_time')->get();
-        $taken  = ScreenSlotAssignment::all(); // for Alpine filtering - available slots
+        $taken  = ScreenSlotAssignment::all();
 
         return view('admin.ssa.create', compact('venues', 'movies', 'slots', 'taken'));
     }
 
     /**
-     * Store new assignment.
+     * Store new assignment (always inactive initially)
      */
     public function store(Request $request)
     {
@@ -51,31 +51,34 @@ class ScreenSlotAssignmentController extends Controller
             'screen_id' => ['required', 'exists:screens,id'],
             'movie_id'  => ['required', 'exists:movies,id'],
             'day'       => ['required', 'integer', 'min:1', 'max:7'],
-
             'slot_id'   => [
                 'required',
                 'exists:slots,id',
-
-                // Prevent double booking:
-                // Screen cannot use same slot on same day twice.
                 Rule::unique('screen_slot_assignments')
-                    ->where(
-                        fn($query) =>
-                        $query->where('screen_id', request('screen_id'))
-                            ->where('day', request('day'))
+                    ->where(fn ($q) =>
+                        $q->where('screen_id', $request->screen_id)
+                          ->where('day', $request->day)
                     ),
             ],
         ]);
 
-        ScreenSlotAssignment::create($validated);
+        ScreenSlotAssignment::create($validated + [
+            'status' => 'inactive',
+        ]);
 
         return redirect()
             ->route('admin.ssa.index')
             ->with('success', 'Show assigned successfully.');
     }
+
+    /**
+     * View assignment
+     */
     public function show($id)
-    {  
-        $ssa = ScreenSlotAssignment::with(['venue', 'screen', 'slot', 'movie'])->findOrFail($id);
+    {
+        $ssa = ScreenSlotAssignment::with(['venue', 'screen', 'slot', 'movie'])
+            ->findOrFail($id);
+
         return view('admin.ssa.show', compact('ssa'));
     }
 
@@ -87,15 +90,13 @@ class ScreenSlotAssignmentController extends Controller
         $venues = Venue::with('screens')->orderBy('name')->get();
         $movies = Movie::orderBy('title')->get();
         $slots  = Slot::orderBy('start_time')->get();
-
-        // All other records except current for slot filtering
-        $taken = ScreenSlotAssignment::where('id', '!=', $ssa->id)->get();
+        $taken  = ScreenSlotAssignment::where('id', '!=', $ssa->id)->get();
 
         return view('admin.ssa.edit', compact('ssa', 'venues', 'movies', 'slots', 'taken'));
     }
 
     /**
-     * Update existing assignment.
+     * Update assignment (does NOT auto-activate)
      */
     public function update(Request $request, ScreenSlotAssignment $ssa)
     {
@@ -104,18 +105,14 @@ class ScreenSlotAssignmentController extends Controller
             'screen_id' => ['required', 'exists:screens,id'],
             'movie_id'  => ['required', 'exists:movies,id'],
             'day'       => ['required', 'integer', 'min:1', 'max:7'],
-
             'slot_id'   => [
                 'required',
                 'exists:slots,id',
-
-                // Prevent double booking, but ignore current SSA record
                 Rule::unique('screen_slot_assignments')
                     ->ignore($ssa->id)
-                    ->where(
-                        fn($query) =>
-                        $query->where('screen_id', request('screen_id'))
-                            ->where('day', request('day'))
+                    ->where(fn ($q) =>
+                        $q->where('screen_id', $request->screen_id)
+                          ->where('day', $request->day)
                     ),
             ],
         ]);
@@ -128,7 +125,7 @@ class ScreenSlotAssignmentController extends Controller
     }
 
     /**
-     * Delete assignment.
+     * Delete assignment
      */
     public function destroy(ScreenSlotAssignment $ssa)
     {
@@ -137,5 +134,35 @@ class ScreenSlotAssignmentController extends Controller
         return redirect()
             ->route('admin.ssa.index')
             ->with('success', 'Show deleted successfully.');
+    }
+
+    /**
+     * Toggle ACTIVE / INACTIVE (AJAX)
+     * Ensures only ONE active SSA per screen
+     */
+    public function toggleStatus(Request $request, ScreenSlotAssignment $ssa)
+    {
+        $request->validate([
+            'status' => ['required', Rule::in(['active', 'inactive'])],
+        ]);
+
+        DB::transaction(function () use ($ssa, $request) {
+
+            if ($request->status === 'active') {
+                // Deactivate all OTHER SSAs for this screen
+                ScreenSlotAssignment::where('screen_id', $ssa->screen_id)
+                    ->where('id', '!=', $ssa->id)
+                    ->update(['status' => 'inactive']);
+            }
+
+            $ssa->update([
+                'status' => $request->status,
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'status'  => $request->status,
+        ]);
     }
 }

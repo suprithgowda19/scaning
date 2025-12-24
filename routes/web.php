@@ -78,6 +78,11 @@ Route::middleware(['auth', 'active.user'])->prefix('admin')->name('admin.')->gro
     Route::resource('movies', MovieController::class);
     Route::resource('ssa', ScreenSlotAssignmentController::class)->names('ssa');
 
+    Route::post(
+        'ssa/{ssa}/toggle-status',
+        [ScreenSlotAssignmentController::class, 'toggleStatus']
+    )->name('ssa.toggle-status');
+
 
     Route::resource('slots', SlotController::class);
 });
