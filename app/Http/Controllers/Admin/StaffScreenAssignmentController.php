@@ -22,14 +22,14 @@ class StaffScreenAssignmentController extends Controller
                 'venue:id,name',
                 'screen:id,name',
             ])
-            ->orderByDesc('id')
+            ->latest()
             ->paginate(20);
 
         return view('admin.staff-assignments.index', compact('assignments'));
     }
 
     /**
-     * Show create form
+     * Create form
      */
     public function create()
     {
@@ -37,7 +37,7 @@ class StaffScreenAssignmentController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $venues = Venue::with('screens:id,venue_id,name,status')
+        $venues = Venue::with('screens:id,venue_id,name')
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -49,20 +49,13 @@ class StaffScreenAssignmentController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate(
-            [
-                'user_id'   => 'required|exists:users,id',
-                'venue_id'  => 'required|exists:venues,id',
-                'screen_id' => 'required|exists:screens,id',
-            ],
-            [
-                'user_id.required'   => 'Please select a staff member.',
-                'venue_id.required'  => 'Please select a venue.',
-                'screen_id.required' => 'Please select a screen.',
-            ]
-        );
+        $validated = $request->validate([
+            'user_id'   => 'required|exists:users,id',
+            'venue_id'  => 'required|exists:venues,id',
+            'screen_id' => 'required|exists:screens,id',
+        ]);
 
-        // Ensure user is STAFF
+        // Ensure staff role
         User::role('staff')->findOrFail($validated['user_id']);
 
         // Ensure screen belongs to venue
@@ -70,40 +63,12 @@ class StaffScreenAssignmentController extends Controller
             ->where('venue_id', $validated['venue_id'])
             ->firstOrFail();
 
-        /**
-         * BUSINESS RULE #1
-         * Staff can have ONLY ONE active assignment
-         */
-        $alreadyAssigned = StaffScreenAssignment::where('user_id', $validated['user_id'])
-            ->where('active', true)
-            ->exists();
-
-        if ($alreadyAssigned) {
-            return back()
-                ->withErrors([
-                    'user_id' => 'This staff member is already assigned to another screen.',
-                ])
-                ->withInput();
-        }
-
-        /**
-         * BUSINESS RULE #2
-         * Prevent duplicate assignment (same staff + same screen)
-         */
-        $duplicate = StaffScreenAssignment::where([
-            'user_id'   => $validated['user_id'],
-            'screen_id' => $validated['screen_id'],
-        ])->exists();
-
-        if ($duplicate) {
-            return back()
-                ->withErrors([
-                    'screen_id' => 'This staff member is already assigned to the selected screen.',
-                ])
-                ->withInput();
-        }
-
         DB::transaction(function () use ($validated) {
+
+            // Deactivate existing assignment (REASSIGNMENT)
+            StaffScreenAssignment::where('user_id', $validated['user_id'])
+                ->update(['active' => false]);
+
             StaffScreenAssignment::create([
                 'user_id'   => $validated['user_id'],
                 'venue_id'  => $validated['venue_id'],
@@ -114,11 +79,11 @@ class StaffScreenAssignmentController extends Controller
 
         return redirect()
             ->route('admin.staff-assignments.index')
-            ->with('success', 'Staff assigned to screen successfully.');
+            ->with('success', 'Staff assigned successfully.');
     }
 
     /**
-     * Show edit form
+     * Edit form
      */
     public function edit(string $id)
     {
@@ -129,7 +94,7 @@ class StaffScreenAssignmentController extends Controller
         ])->findOrFail($id);
 
         $staff = User::role('staff')->orderBy('name')->get(['id', 'name']);
-        $venues = Venue::with('screens:id,venue_id,name,status')
+        $venues = Venue::with('screens:id,venue_id,name')
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -141,42 +106,41 @@ class StaffScreenAssignmentController extends Controller
 
     /**
      * Update assignment
-     * Handles:
-     * - AJAX toggle (active/inactive)
-     * - Full edit form submit
      */
     public function update(Request $request, string $id)
     {
         $assignment = StaffScreenAssignment::findOrFail($id);
 
         /**
-         * AJAX toggle from index page
+         * AJAX toggle
          */
         if ($request->expectsJson()) {
-            $request->validate([
-                'active' => 'required|boolean',
-            ]);
+            $request->validate(['active' => 'required|boolean']);
 
-            $assignment->update([
-                'active' => $request->active,
-            ]);
+            DB::transaction(function () use ($assignment, $request) {
+
+                if ($request->active) {
+                    // Deactivate other screens for this staff
+                    StaffScreenAssignment::where('user_id', $assignment->user_id)
+                        ->where('id', '!=', $assignment->id)
+                        ->update(['active' => false]);
+                }
+
+                $assignment->update(['active' => $request->active]);
+            });
 
             return response()->json(['success' => true]);
         }
 
-        $validated = $request->validate(
-            [
-                'user_id'   => 'required|exists:users,id',
-                'venue_id'  => 'required|exists:venues,id',
-                'screen_id' => 'required|exists:screens,id',
-                'active'    => 'required|boolean',
-            ],
-            [
-                'user_id.required'   => 'Please select a staff member.',
-                'venue_id.required'  => 'Please select a venue.',
-                'screen_id.required' => 'Please select a screen.',
-            ]
-        );
+        /**
+         * Full edit
+         */
+        $validated = $request->validate([
+            'user_id'   => 'required|exists:users,id',
+            'venue_id'  => 'required|exists:venues,id',
+            'screen_id' => 'required|exists:screens,id',
+            'active'    => 'required|boolean',
+        ]);
 
         User::role('staff')->findOrFail($validated['user_id']);
 
@@ -184,23 +148,14 @@ class StaffScreenAssignmentController extends Controller
             ->where('venue_id', $validated['venue_id'])
             ->firstOrFail();
 
-        /**
-         * Prevent assigning same staff to multiple screens
-         */
-        $conflict = StaffScreenAssignment::where('user_id', $validated['user_id'])
-            ->where('id', '!=', $assignment->id)
-            ->where('active', true)
-            ->exists();
-
-        if ($conflict) {
-            return back()
-                ->withErrors([
-                    'user_id' => 'This staff member is already assigned to another screen.',
-                ])
-                ->withInput();
-        }
-
         DB::transaction(function () use ($assignment, $validated) {
+
+            if ($validated['active']) {
+                StaffScreenAssignment::where('user_id', $validated['user_id'])
+                    ->where('id', '!=', $assignment->id)
+                    ->update(['active' => false]);
+            }
+
             $assignment->update($validated);
         });
 
@@ -210,7 +165,7 @@ class StaffScreenAssignmentController extends Controller
     }
 
     /**
-     * Revoke assignment (soft)
+     * Revoke assignment
      */
     public function destroy(string $id)
     {
@@ -219,6 +174,6 @@ class StaffScreenAssignmentController extends Controller
 
         return redirect()
             ->route('admin.staff-assignments.index')
-            ->with('success', 'Assignment revoked successfully.');
+            ->with('success', 'Assignment revoked.');
     }
 }

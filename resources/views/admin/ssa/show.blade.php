@@ -1,95 +1,153 @@
 @extends('layouts.master')
 
-@section('title', 'Show Assignment')
-@section('page_title', 'Show Assignment')
+@section('title', 'Show Details')
+@section('page_title', 'Show Details')
 
 @section('breadcrumb')
     <li class="breadcrumb-item">
-        <a href="{{ route('admin.ssa.index') }}">Show Assignments</a>
+        <a href="{{ route('admin.ssa.index') }}">Shows</a>
     </li>
     <li class="breadcrumb-item active">View</li>
 @endsection
 
+@push('css')
+<style>
+    .section {
+        margin-bottom: 24px;
+    }
+
+    .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        margin-bottom: 10px;
+    }
+
+    .movie-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .meta {
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .kv {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .kv:last-child {
+        border-bottom: none;
+    }
+
+    .kv-label {
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .kv-value {
+        color: #111827;
+        font-weight: 500;
+        text-align: right;
+    }
+</style>
+@endpush
+
 @section('content')
 
-    <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
+<div class="row">
+    <div class="col-lg-7 col-md-9 mx-auto">
 
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Show Details</h5>
+        <div class="card">
+            <div class="card-body">
+
+                {{-- MOVIE --}}
+                <div class="section">
+                    <div class="movie-title">
+                        {{ $ssa->movie->title }}
+                    </div>
+
+                    <div class="meta mt-1">
+                        {{ $ssa->movie->language ?? '—' }}
+                    </div>
                 </div>
 
-                <div class="card-body">
+                {{-- SCHEDULE --}}
+                <div class="section">
+                    <div class="section-title">Schedule</div>
 
-                    <div class="row mb-3">
-                        <div class="col-sm-4 fw-bold">Venue</div>
-                        <div class="col-sm-8">{{ $ssa->venue->name }}</div>
+                    <div class="kv">
+                        <div class="kv-label">Date</div>
+                        <div class="kv-value">
+                            {{ \Carbon\Carbon::parse($ssa->show_date)->format('d M Y') }}
+                        </div>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-sm-4 fw-bold">Screen</div>
-                        <div class="col-sm-8">{{ $ssa->screen->name }}</div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-sm-4 fw-bold">Day</div>
-                        <div class="col-sm-8">Day {{ $ssa->day }}</div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-sm-4 fw-bold">Slot Time</div>
-                        <div class="col-sm-8">
+                    <div class="kv">
+                        <div class="kv-label">Time</div>
+                        <div class="kv-value">
                             {{ \Carbon\Carbon::parse($ssa->slot->start_time)->format('h:i A') }}
+                            –
+                            {{ \Carbon\Carbon::parse($ssa->slot->end_time)->format('h:i A') }}
                         </div>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-sm-4 fw-bold">Movie</div>
-                        <div class="col-sm-8">{{ $ssa->movie->title }}</div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-sm-4 fw-bold">Status</div>
-                        <div class="col-sm-8">
-                            @if ($ssa->status === 'active')
-                                <span class="badge bg-success">Active</span>
-                            @else
-                                <span class="badge bg-secondary">Inactive</span>
-                            @endif
+                    <div class="kv">
+                        <div class="kv-label">Venue</div>
+                        <div class="kv-value">
+                            {{ $ssa->screen->venue->name }}
                         </div>
                     </div>
 
-                    <hr>
+                    <div class="kv">
+                        <div class="kv-label">Screen</div>
+                        <div class="kv-value">
+                            {{ $ssa->screen->name }}
+                        </div>
+                    </div>
+                </div>
 
-                    <div class="row mb-2">
-                        <div class="col-sm-4 fw-bold">Created At</div>
-                        <div class="col-sm-8">
+                {{-- SYSTEM --}}
+                <div class="section">
+                    <div class="section-title">System</div>
+
+                    <div class="kv">
+                        <div class="kv-label">Created</div>
+                        <div class="kv-value">
                             {{ $ssa->created_at->format('d M Y, h:i A') }}
                         </div>
                     </div>
 
-                    <div class="row mb-4">
-                        <div class="col-sm-4 fw-bold">Last Updated</div>
-                        <div class="col-sm-8">
+                    <div class="kv">
+                        <div class="kv-label">Last Updated</div>
+                        <div class="kv-value">
                             {{ $ssa->updated_at->format('d M Y, h:i A') }}
                         </div>
                     </div>
-
-                    <div class="d-flex gap-2">
-                        <a href="{{ route('admin.ssa.index') }}" class="btn btn-secondary">
-                            Back
-                        </a>
-
-                        <a href="{{ route('admin.ssa.edit', $ssa->id) }}" class="btn btn-primary">
-                            Edit
-                        </a>
-                    </div>
-
                 </div>
-            </div>
 
+                {{-- ACTIONS --}}
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ route('admin.ssa.index') }}" class="btn btn-light">
+                        Back
+                    </a>
+
+                    <a href="{{ route('admin.ssa.edit', $ssa->id) }}" class="btn btn-primary">
+                        Edit / Swap Movie
+                    </a>
+                </div>
+
+            </div>
         </div>
+
     </div>
+</div>
 
 @endsection

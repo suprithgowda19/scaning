@@ -5,62 +5,22 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Movie;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class MovieController extends Controller
 {
     /**
-     * Display all movies.
+     * Display all movies (read-only list).
      */
     public function index()
     {
-        $movies = Movie::orderBy('title')->get();
+        $movies = Movie::orderBy('title')->paginate(50);
 
         return view('admin.movies.index', compact('movies'));
     }
 
     /**
-     * Show the create form.
+     * Show single movie details.
      */
-    public function create()
-    {
-        $languages = ['Kannada', 'Hindi', 'English', 'Tamil', 'Telugu', 'Malayalam'];
-
-        return view('admin.movies.create', compact('languages'));
-    }
-
-    /**
-     * Store a new movie using ID-based logic.
-     */
-    public function store(Request $request)
-    {
-        $request->validate([
-            'title'       => ['required', 'string', 'max:255'],
-            'language'    => ['required', 'string'],
-            'duration'    => ['nullable', 'integer', 'min:1'],
-            'description' => ['nullable', 'string'],
-            'status'      => ['required', 'in:active,inactive'],
-            'poster'      => ['nullable', 'image', 'max:2048'], // 2MB
-        ]);
-
-        $posterPath = null;
-
-        if ($request->hasFile('poster')) {
-            $posterPath = $request->file('poster')->store('movies', 'public');
-        }
-
-        Movie::create([
-            'title'       => $request->title,
-            'language'    => $request->language,
-            'duration'    => $request->duration,
-            'description' => $request->description,
-            'status'      => $request->status,
-            'poster'      => $posterPath,
-        ]);
-
-        return redirect()->route('admin.movies.index')
-            ->with('success', 'Movie created successfully.');
-    }
     public function show($id)
     {
         $movie = Movie::findOrFail($id);
@@ -69,91 +29,65 @@ class MovieController extends Controller
     }
 
     /**
-     * Show edit form.
+     * Show edit form (metadata correction only).
      */
     public function edit($id)
     {
         $movie = Movie::findOrFail($id);
-        $languages = ['Kannada', 'Hindi', 'English', 'Tamil', 'Telugu', 'Malayalam'];
+
+        $languages = [
+            'Kannada',
+            'Hindi',
+            'English',
+            'Tamil',
+            'Telugu',
+            'Malayalam',
+        ];
 
         return view('admin.movies.edit', compact('movie', 'languages'));
     }
 
     /**
-     * Update movie using ID.
+     * Update movie metadata.
+     * Scheduler identity (external_film_id) is NOT editable.
      */
     public function update(Request $request, $id)
     {
         $movie = Movie::findOrFail($id);
 
         $request->validate([
-            'title'       => ['required', 'string', 'max:255'],
-            'language'    => ['required', 'string'],
-            'duration'    => ['nullable', 'integer', 'min:1'],
-            'description' => ['nullable', 'string'],
-            'status'      => ['required', 'in:active,inactive'],
-            'poster'      => ['nullable', 'image', 'max:2048'],
+            'title'          => ['required', 'string', 'max:255'],
+            'original_title' => ['nullable', 'string', 'max:255'],
+            'language'       => ['nullable', 'string', 'max:100'],
+            'duration'       => ['nullable', 'integer', 'min:1'],
+            'country'        => ['nullable', 'string', 'max:100'],
+            'year'           => ['nullable', 'string', 'max:10'],
+            'director'       => ['nullable', 'string', 'max:255'],
+            'category'       => ['nullable', 'string', 'max:100'],
         ]);
-
-        $posterPath = $movie->poster;
-
-        if ($request->hasFile('poster')) {
-
-            // Delete existing poster safely
-            if ($posterPath && Storage::disk('public')->exists($posterPath)) {
-                Storage::disk('public')->delete($posterPath);
-            }
-
-            $posterPath = $request->file('poster')->store('movies', 'public');
-        }
 
         $movie->update([
-            'title'       => $request->title,
-            'language'    => $request->language,
-            'duration'    => $request->duration,
-            'description' => $request->description,
-            'status'      => $request->status,
-            'poster'      => $posterPath,
+            'title'          => $request->title,
+            'original_title' => $request->original_title,
+            'language'       => $request->language,
+            'duration'       => $request->duration,
+            'country'        => $request->country,
+            'year'           => $request->year,
+            'director'       => $request->director,
+            'category'       => $request->category,
         ]);
 
-        return redirect()->route('admin.movies.index')
+        return redirect()
+            ->route('admin.movies.index')
             ->with('success', 'Movie updated successfully.');
     }
 
     /**
-     * Delete a movie and remove file safely.
+     * Deleting movies is NOT allowed.
+     * Movies may already be referenced by shows (SSA).
      */
-    public function destroy($id)
+    public function destroy()
     {
-        $movie = Movie::findOrFail($id);
-
-        if ($movie->poster && Storage::disk('public')->exists($movie->poster)) {
-            Storage::disk('public')->delete($movie->poster);
-        }
-
-        $movie->delete();
-
-        return redirect()->route('admin.movies.index')
-            ->with('success', 'Movie deleted successfully.');
-    }
-
-    /**
-     * AJAX: Toggle status (active / inactive).
-     */
-    public function toggleStatus(Request $request)
-    {
-        $request->validate([
-            'id'     => 'required|exists:movies,id',
-            'status' => 'required|in:active,inactive',
-        ]);
-
-        $movie = Movie::findOrFail($request->id);
-        $movie->status = $request->status;
-        $movie->save();
-
-        return response()->json([
-            'success' => true,
-            'status'  => $movie->status
-        ]);
+        abort(403, 'Deleting movies is not allowed.');
     }
 }

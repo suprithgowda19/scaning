@@ -6,61 +6,61 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('screen_slot_assignments', function (Blueprint $table) {
+
             $table->id();
 
-            // ===============================
-            // CORE RELATIONSHIPS
-            // ===============================
-            $table->foreignId('venue_id')
-                ->constrained()
-                ->cascadeOnDelete();
-
+            /**
+             * Physical screen where the show runs
+             */
             $table->foreignId('screen_id')
-                ->constrained()
+                ->constrained('screens')
                 ->cascadeOnDelete();
 
+            /**
+             * Global time slot (start_time + end_time)
+             */
             $table->foreignId('slot_id')
-                ->constrained()
+                ->constrained('slots')
                 ->cascadeOnDelete();
 
+            /**
+             * Movie being screened
+             */
             $table->foreignId('movie_id')
-                ->constrained()
+                ->constrained('movies')
                 ->cascadeOnDelete();
 
-            // ===============================
-            // FESTIVAL / SCREENING CONTEXT
-            // ===============================
-            // Day number (1–7)
-            $table->unsignedTinyInteger('day');
+            /**
+             * Actual calendar date of the show
+             * Comes from scheduler.date
+             */
+            $table->date('show_date');
 
-            // Runtime status controlled by admin
-            // IMPORTANT: default must be INACTIVE
-            $table->enum('status', ['active', 'inactive'])
-                ->default('inactive');
-
+            /**
+             * Audit timestamps
+             */
             $table->timestamps();
 
-            // ===============================
-            // HARD CONSTRAINTS
-            // ===============================
-            // Same screen cannot have two shows
-            // at the same slot on the same day
+            /**
+             * HARD CONSTRAINT
+             * One screen can have only ONE movie per slot per date
+             */
             $table->unique(
-                ['screen_id', 'slot_id', 'day'],
-                'uniq_screen_day_slot'
+                ['screen_id', 'slot_id', 'show_date'],
+                'uniq_screen_slot_date'
             );
+
+            /**
+             * PERFORMANCE INDEXES
+             */
+            $table->index(['show_date', 'screen_id'], 'idx_date_screen');
+            $table->index(['movie_id', 'show_date'], 'idx_movie_date');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('screen_slot_assignments');

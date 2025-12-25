@@ -100,11 +100,19 @@ Route::middleware(['auth', 'active.user', 'role:admin'])
             StaffScreenAssignmentController::class
         );
     });
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 
 Route::middleware(['auth'])->prefix('staff')->group(function () {
-    Route::get('/scan', [ScanController::class, 'index'])->name('staff.scan.index');
-    Route::post('/scan', [ScanController::class, 'scan'])->name('staff.scan.store');
-    Route::get('/scan/stats', [ScanController::class, 'stats'])->name('staff.scan.stats');
+
+    Route::get('/scan', [ScanController::class, 'index'])
+        ->name('staff.scan.index');
+
+    Route::post('/scan', [ScanController::class, 'scan'])
+        ->withoutMiddleware(VerifyCsrfToken::class)
+        ->name('staff.scan.store');
+
+    Route::get('/scan/stats', [ScanController::class, 'stats'])
+        ->name('staff.scan.stats');
 });
 
 Route::middleware(['auth', 'role:staff'])->group(function () {
@@ -117,3 +125,9 @@ Route::middleware(['auth', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard/export/pdf', [StaffDashboardController::class, 'exportPdf'])
         ->name('staff.dashboard.export.pdf');
 });
+use App\Services\SchedulerImportService;
+
+Route::get('/admin/run-scheduler-import', function () {
+    app(SchedulerImportService::class)->importForVenue(1); // venue_id
+    return 'Scheduler import DONE';
+})->middleware(['auth', 'role:admin']);

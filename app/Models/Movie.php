@@ -6,35 +6,34 @@ use Illuminate\Database\Eloquent\Model;
 
 class Movie extends Model
 {
-    /**
-     * Mass assignable attributes.
-     */
     protected $fillable = [
+        'external_film_id',
         'title',
-        'language',
-        'poster_path',
+        'original_title',
         'duration',
-        'description',
-        'status',
+        'language',
+        'country',
+        'year',
+        'director',
+        'category',
     ];
 
-    /**
-     * Accessor: returns full poster URL (local or CDN ready).
-     */
-    public function getPosterUrlAttribute()
-    {
-        if (!$this->poster_path) {
-            return asset('assets/images/no-poster.png'); // fallback
-        }
+    protected $casts = [
+        'external_film_id' => 'integer',
+        'duration'         => 'integer', // minutes
+    ];
 
-        return asset('storage/' . $this->poster_path);
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     /**
-     * Scope: only active movies.
+     * A movie can have many scheduled shows
      */
-    public function scopeActive($query)
+    public function screenSlotAssignments()
     {
-        return $query->where('status', 'active');
+        return $this->hasMany(ScreenSlotAssignment::class);
     }
 }

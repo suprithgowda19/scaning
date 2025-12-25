@@ -11,17 +11,17 @@ return new class extends Migration
         Schema::create('slots', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('venue_id')
-                ->constrained()
-                ->cascadeOnDelete();
-
-            // Use TIME because you only need show start, not date.
+            // Global time definition
             $table->time('start_time');
+            $table->time('end_time');
 
             $table->timestamps();
 
-            // A venue cannot have two slots starting at same time.
-            $table->unique(['venue_id', 'start_time']);
+            // Prevent duplicate slot definitions
+            $table->unique(
+                ['start_time', 'end_time'],
+                'uniq_slots_time_range'
+            );
         });
     }
 

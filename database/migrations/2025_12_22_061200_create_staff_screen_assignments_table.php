@@ -13,14 +13,14 @@ return new class extends Migration
             $table->id();
 
             /**
-             * Staff user
+             * Staff user (role = staff)
              */
             $table->foreignId('user_id')
                 ->constrained('users')
                 ->cascadeOnDelete();
 
             /**
-             * Venue (explicit for safety & filtering)
+             * Venue (explicit, avoids joins at runtime)
              */
             $table->foreignId('venue_id')
                 ->constrained('venues')
@@ -34,7 +34,8 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             /**
-             * Assignment status
+             * Whether this assignment is active
+             * (staff dashboard uses only active ones)
              */
             $table->boolean('active')
                 ->default(true)
@@ -45,20 +46,31 @@ return new class extends Migration
              */
             $table->timestamps();
 
+            /* -----------------------------------------
+             | HARD CONSTRAINTS (IMPORTANT)
+             |------------------------------------------*/
+
             /**
-             * HARD CONSTRAINTS
-             * 1. Prevent duplicate assignment
-             * 2. Ensure uniqueness per venue
+             * 1. Prevent duplicate assignment of same screen
+             *    to the same staff
              */
             $table->unique(
-                ['user_id', 'venue_id', 'screen_id'],
-                'uniq_staff_venue_screen'
+                ['user_id', 'screen_id'],
+                'uniq_staff_screen'
             );
 
             /**
-             * Performance indexes
+             * 2. A staff can have ONLY ONE active screen
+             *    (critical for scanning & dashboard)
              */
-            $table->index(['user_id', 'active']);
+            $table->unique(
+                ['user_id'],
+                'uniq_staff_one_screen'
+            );
+
+            /* -----------------------------------------
+             | PERFORMANCE INDEXES
+             |------------------------------------------*/
             $table->index(['screen_id', 'active']);
             $table->index(['venue_id', 'active']);
         });

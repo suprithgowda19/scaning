@@ -1,245 +1,147 @@
 @extends('layouts.master')
 
-@section('title', 'Show Assignments')
-@section('page_title', 'Show Assignments')
+@section('title', 'Shows')
+@section('page_title', 'Show Schedule')
 
 @section('breadcrumb')
-    <li class="breadcrumb-item">Show Assignments</li>
+    <li class="breadcrumb-item">Shows</li>
 @endsection
 
 @push('css')
-<link rel="stylesheet" type="text/css" href="{{ asset('assets/css/vendors/datatables.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ asset('assets/css/vendors/datatables.css') }}">
+    <style>
+        .btn-square {
+            width: 40px;
+            height: 40px;
+            padding: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px !important;
+        }
 
-<style>
-    .btn-square {
-        width: 40px;
-        height: 40px;
-        padding: 0 !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 10px !important;
-    }
+        .icon-18 {
+            width: 18px;
+            height: 18px;
+        }
 
-    .icon-18 { width: 18px; height: 18px; }
-
-    /* Toggle Switch */
-    .switch {
-        position: relative;
-        display: inline-block;
-        width: 46px;
-        height: 22px;
-    }
-    .switch input { display: none; }
-
-    .slider {
-        position: absolute;
-        cursor: pointer;
-        background-color: #dadada;
-        border-radius: 34px;
-        top: 0; left: 0; right: 0; bottom: 0;
-        transition: .3s;
-    }
-    .slider:before {
-        position: absolute;
-        content: "";
-        height: 16px;
-        width: 16px;
-        left: 3px;
-        bottom: 3px;
-        background: white;
-        border-radius: 50%;
-        transition: .3s;
-    }
-    input:checked + .slider {
-        background-color: #4caf50;
-    }
-    input:checked + .slider:before {
-        transform: translateX(24px);
-    }
-
-    .badge-active {
-        background: #dcfce7;
-        color: #166534;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-    .badge-inactive {
-        background: #fee2e2;
-        color: #991b1b;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-</style>
+        .meta {
+            font-size: 12px;
+            color: #6b7280;
+        }
+    </style>
 @endpush
 
 @section('content')
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <a href="{{ route('admin.ssa.create') }}" class="btn btn-primary text-white">
-        <i data-feather="plus-circle" class="icon-18 me-1"></i> Assign Show
-    </a>
-</div>
+    <div class="mb-3">
+        <span class="text-muted">
+            Shows are imported from scheduler. You may edit a show to swap movies or move screens.
+        </span>
+    </div>
 
-<div class="table-responsive">
-    <table class="display" id="ssaTable" style="width:100%">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Venue</th>
-                <th>Screen</th>
-                <th>Day</th>
-                <th>Slot</th>
-                <th>Movie</th>
-                <th>Status</th>
-                <th class="text-center">Actions</th>
-            </tr>
-        </thead>
+    <div class="table-responsive">
+        <table class="display" id="ssaTable" style="width:100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Venue</th>
+                    <th>Screen</th>
+                    <th>Time</th>
+                    <th>Movie</th>
+                    <th class="text-center" style="width:120px;">Actions</th>
+                </tr>
+            </thead>
 
-        <tbody>
-        @foreach ($assignments as $index => $ssa)
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>{{ $ssa->venue->name }}</td>
-                <td>{{ $ssa->screen->name }}</td>
-                <td>Day {{ $ssa->day }}</td>
-                <td>{{ \Carbon\Carbon::parse($ssa->slot->start_time)->format('h:i A') }}</td>
-                <td>{{ $ssa->movie->title }}</td>
+            <tbody>
+                @forelse ($shows as $index => $ssa)
+                    <tr>
+                        <td>{{ $index + 1 }}</td>
 
-                {{-- STATUS --}}
-                <td>
-                    <div class="d-flex align-items-center gap-2">
-                        <label class="switch">
-                            <input type="checkbox"
-                                   class="ssa-toggle"
-                                   data-id="{{ $ssa->id }}"
-                                   {{ $ssa->status === 'active' ? 'checked' : '' }}>
-                            <span class="slider"></span>
-                        </label>
+                        <td>
+                            {{ \Carbon\Carbon::parse($ssa->show_date)->format('d M Y') }}
+                        </td>
 
-                        <span class="{{ $ssa->status === 'active' ? 'badge-active' : 'badge-inactive' }}">
-                            {{ strtoupper($ssa->status) }}
-                        </span>
-                    </div>
-                </td>
+                        <td>
+                            {{ $ssa->screen->venue->name }}
+                        </td>
 
-                {{-- ACTIONS --}}
-                <td class="text-center">
-                    <div class="d-flex justify-content-center gap-2">
+                        <td>
+                            {{ $ssa->screen->name }}
+                        </td>
 
-                        <button class="btn btn-info btn-square"
-                                onclick="location.href='{{ route('admin.ssa.show', $ssa->id) }}'">
-                            <i data-feather="eye" class="icon-18"></i>
-                        </button>
+                        <td>
+                            {{ \Carbon\Carbon::parse($ssa->slot->start_time)->format('h:i A') }}
+                            –
+                            {{ \Carbon\Carbon::parse($ssa->slot->end_time)->format('h:i A') }}
+                        </td>
 
-                        <button class="btn btn-primary btn-square"
-                                onclick="location.href='{{ route('admin.ssa.edit', $ssa->id) }}'">
-                            <i data-feather="edit" class="icon-18"></i>
-                        </button>
+                        <td>
+                            <strong>{{ $ssa->movie->title }}</strong>
+                            @if ($ssa->movie->language)
+                                <div class="meta">
+                                    {{ $ssa->movie->language }}
+                                </div>
+                            @endif
+                        </td>
 
-                        <form action="{{ route('admin.ssa.destroy', $ssa->id) }}"
-                              method="POST"
-                              class="delete-form">
-                            @csrf
-                            @method('DELETE')
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-2">
 
-                            <button type="button"
-                                    class="btn btn-danger btn-square delete-btn">
-                                <i data-feather="trash-2" class="icon-18"></i>
-                            </button>
-                        </form>
+                                {{-- VIEW --}}
+                                <a href="{{ route('admin.ssa.show', $ssa->id) }}" class="btn btn-info btn-square"
+                                    title="View Show">
+                                    <i data-feather="eye" class="icon-18"></i>
+                                </a>
 
-                    </div>
-                </td>
-            </tr>
-        @endforeach
-        </tbody>
-    </table>
-</div>
+                                {{-- EDIT / SWAP --}}
+                                <a href="{{ route('admin.ssa.edit', $ssa->id) }}" class="btn btn-primary btn-square"
+                                    title="Edit / Swap">
+                                    <i data-feather="edit" class="icon-18"></i>
+                                </a>
+
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            No shows found.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 
 @endsection
 
 @push('scripts')
+    <script src="{{ asset('assets/js/datatable/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ asset('assets/js/datatable/datatables/datatable.custom.js') }}"></script>
 
-<script src="{{ asset('assets/js/datatable/datatables/jquery.dataTables.min.js') }}"></script>
-<script src="{{ asset('assets/js/datatable/datatables/datatable.custom.js') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            feather.replace();
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    feather.replace();
-
-    $('#ssaTable').DataTable({
-        pagingType: "simple_numbers"
-    });
-
-    // DELETE CONFIRM
-    document.querySelectorAll(".delete-btn").forEach(btn => {
-        btn.addEventListener("click", function () {
-            const form = this.closest("form");
-
-            Swal.fire({
-                title: "Delete Show Assignment?",
-                text: "This show will be removed from the schedule.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonText: "Yes, delete it"
-            }).then(res => {
-                if (res.isConfirmed) form.submit();
+            $('#ssaTable').DataTable({
+                pagingType: "simple_numbers",
+                order: [
+                    [1, 'asc'],
+                    [4, 'asc']
+                ]
             });
-        });
-    });
 
-    // STATUS TOGGLE
-    document.querySelectorAll('.ssa-toggle').forEach(toggle => {
-        toggle.addEventListener('change', function () {
-
-            const ssaId = this.dataset.id;
-            const status = this.checked ? 'active' : 'inactive';
-
-            fetch(`{{ url('admin/ssa') }}/${ssaId}/toggle-status`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': "{{ csrf_token() }}",
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ status })
-            })
-            .then(res => res.json())
-            .then(() => {
+            @if (session('success'))
                 Swal.fire({
                     icon: "success",
-                    title: "Updated",
-                    text: `Show is now ${status.toUpperCase()}`,
-                    timer: 1200,
+                    title: "Success",
+                    text: "{{ session('success') }}",
+                    timer: 1500,
                     showConfirmButton: false
-                }).then(() => location.reload());
-            })
-            .catch(() => {
-                Swal.fire("Error", "Could not update status", "error");
-                this.checked = !this.checked;
-            });
-
+                });
+            @endif
         });
-    });
-
-    @if (session('success'))
-        Swal.fire({
-            icon: "success",
-            title: "Success",
-            text: "{{ session('success') }}",
-            timer: 1500,
-            showConfirmButton: false,
-            position: "center"
-        });
-    @endif
-
-});
-</script>
+    </script>
 @endpush

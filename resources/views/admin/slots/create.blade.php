@@ -4,70 +4,89 @@
 @section('page_title', 'Create Slot')
 
 @section('breadcrumb')
-    <li class="breadcrumb-item"><a href="{{ route('admin.slots.index') }}">Slots</a></li>
+    <li class="breadcrumb-item">
+        <a href="{{ route('admin.slots.index') }}">Slots</a>
+    </li>
     <li class="breadcrumb-item active">Create</li>
 @endsection
 
 @section('content')
-<div class="row">
-    <div class="col-sm-12">
-        
-        <div class="card">
-            <div class="card-body">
 
-                <form method="POST" action="{{ route('admin.slots.store') }}">
-                    @csrf
+<div class="card">
+    <div class="card-body">
 
-                    <div class="row g-3">
+        <form method="POST"
+              action="{{ route('admin.slots.store') }}"
+              class="needs-validation"
+              novalidate>
 
-                        <!-- Venue -->
-                        <div class="col-md-6">
-                            <label for="venue_id" class="form-label">Venue</label>
-                            <select name="venue_id" id="venue_id" class="form-select" required>
-                                <option value="">Select Venue</option>
-                                @foreach($venues as $venue)
-                                    <option value="{{ $venue->id }}"
-                                        {{ old('venue_id') == $venue->id ? 'selected' : '' }}>
-                                        {{ $venue->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('venue_id')
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
-                        </div>
+            @csrf
 
-                        <!-- Start Time -->
-                        <div class="col-md-6">
-                            <label for="start_time" class="form-label">Start Time</label>
-                            <input type="time"
-                                   name="start_time"
-                                   id="start_time"
-                                   class="form-control"
-                                   value="{{ old('start_time') }}"
-                                   required>
-                            @error('start_time')
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
-                        </div>
+            <div class="row g-4">
 
-                    </div>
+                {{-- START TIME --}}
+                <div class="col-md-6">
+                    <label class="form-label">
+                        Start Time <span class="text-danger">*</span>
+                    </label>
+                    <input type="time"
+                           name="start_time"
+                           value="{{ old('start_time') }}"
+                           class="form-control @error('start_time') is-invalid @enderror"
+                           required>
 
-                    <div class="mt-4 d-flex gap-2">
-                        <a href="{{ route('admin.slots.index') }}" class="btn btn-secondary">
-                            Back
-                        </a>
+                    @error('start_time')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
 
-                        <button type="submit" class="btn btn-primary">
-                            Create Slot
-                        </button>
-                    </div>
+                {{-- END TIME --}}
+                <div class="col-md-6">
+                    <label class="form-label">
+                        End Time <span class="text-danger">*</span>
+                    </label>
+                    <input type="time"
+                           name="end_time"
+                           value="{{ old('end_time') }}"
+                           class="form-control @error('end_time') is-invalid @enderror"
+                           required>
 
-                </form>
+                    @error('end_time')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
 
             </div>
+
+            <div class="mt-4 d-flex justify-content-end gap-2">
+
+                <a href="{{ route('admin.slots.index') }}"
+                   class="btn btn-light">
+                    <i data-feather="arrow-left" class="me-1"></i> Back
+                </a>
+
+                <button type="submit"
+                        class="btn btn-primary">
+                    Create Slot
+                </button>
+
+            </div>
+
+        </form>
+
+        <div class="alert alert-info mt-4">
+            <strong>Note:</strong>
+            Slots are <b>global time windows</b>.
+            They are reused across all screens and venues.
         </div>
 
     </div>
 </div>
+
 @endsection
+
+@push('scripts')
+<script>
+    feather.replace();
+</script>
+@endpush

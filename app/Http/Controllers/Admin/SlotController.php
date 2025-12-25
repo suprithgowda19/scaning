@@ -4,43 +4,43 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Slot;
-use App\Models\Venue;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class SlotController extends Controller
 {
-    // List Slots
+    /**
+     * List all global slots.
+     */
     public function index()
     {
-        $slots = Slot::with('venue')
-            ->orderBy('venue_id')
-            ->orderBy('start_time')
-            ->get(); // Using DataTables, no pagination needed
+        $slots = Slot::orderBy('start_time')->get();
 
         return view('admin.slots.index', compact('slots'));
     }
 
-    // Create Page
+    /**
+     * Show create slot form.
+     */
     public function create()
     {
-        $venues = Venue::orderBy('name')->get();
-        return view('admin.slots.create', compact('venues'));
+        return view('admin.slots.create');
     }
 
-    // Store Slot
+    /**
+     * Store a new global slot.
+     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'venue_id'   => ['required', 'exists:venues,id'],
-            'start_time' => [
-                'required',
-                'date_format:H:i',
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time'   => ['required', 'date_format:H:i', 'after:start_time'],
 
-                // Prevent duplicates for same venue
-                Rule::unique('slots')
-                    ->where('venue_id', $request->venue_id),
-            ],
+            // prevent duplicate time windows
+            Rule::unique('slots')->where(function ($q) use ($request) {
+                return $q->where('start_time', $request->start_time)
+                         ->where('end_time', $request->end_time);
+            }),
         ]);
 
         Slot::create($validated);
@@ -50,27 +50,29 @@ class SlotController extends Controller
             ->with('success', 'Slot created successfully.');
     }
 
-    // Edit Page
+    /**
+     * Show edit slot form.
+     */
     public function edit(Slot $slot)
     {
-        $venues = Venue::orderBy('name')->get();
-        return view('admin.slots.edit', compact('slot', 'venues'));
+        return view('admin.slots.edit', compact('slot'));
     }
 
-    // Update Slot
+    /**
+     * Update slot time window.
+     */
     public function update(Request $request, Slot $slot)
     {
         $validated = $request->validate([
-            'venue_id'   => ['required', 'exists:venues,id'],
-            'start_time' => [
-                'required',
-                'date_format:H:i',
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time'   => ['required', 'date_format:H:i', 'after:start_time'],
 
-                // Allow same value for current slot, block duplicates
-                Rule::unique('slots')
-                    ->ignore($slot->id)
-                    ->where('venue_id', $request->venue_id),
-            ],
+            Rule::unique('slots')
+                ->ignore($slot->id)
+                ->where(function ($q) use ($request) {
+                    return $q->where('start_time', $request->start_time)
+                             ->where('end_time', $request->end_time);
+                }),
         ]);
 
         $slot->update($validated);
@@ -80,13 +82,11 @@ class SlotController extends Controller
             ->with('success', 'Slot updated successfully.');
     }
 
-    // Delete Slot
-    public function destroy(Slot $slot)
+    /**
+     * Deleting slots is NOT allowed.
+     */
+    public function destroy()
     {
-        $slot->delete();
-
-        return redirect()
-            ->route('admin.slots.index')
-            ->with('success', 'Slot deleted successfully.');
+        abort(403, 'Deleting slots is not allowed.');
     }
 }

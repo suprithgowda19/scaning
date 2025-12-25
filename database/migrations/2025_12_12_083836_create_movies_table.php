@@ -6,37 +6,64 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('movies', function (Blueprint $table) {
+
             $table->id();
 
-            $table->string('title')->index();
-            $table->string('language', 50)->index();
+            /**
+             * External scheduler / festival film identifier
+             * Comes from scheduler.film_id
+             */
+            $table->unsignedInteger('external_film_id')
+                  ->nullable()
+                  ->unique();
 
-            // poster image stored in storage/app/public/movies
-            $table->string('poster_path')->nullable();
+            /**
+             * Movie titles
+             */
+            $table->string('title', 255);              // English / primary title
+            $table->string('original_title', 255)
+                  ->nullable();                        // Local / festival title
 
-            // movie duration in minutes
-            $table->unsignedInteger('duration')->nullable();
+            /**
+             * Metadata
+             */
+            $table->unsignedSmallInteger('duration')   // minutes
+                  ->nullable();
 
-            $table->text('description')->nullable();
+            $table->string('language', 100)
+                  ->nullable();
 
-            // instead of delete, admin can deactivate
-            $table->enum('status', ['active', 'inactive'])
-                  ->default('active')
-                  ->index();
+            $table->string('country', 100)
+                  ->nullable();
 
+            $table->string('year', 10)
+                  ->nullable();
+
+            $table->string('director', 255)
+                  ->nullable();
+
+            /**
+             * Classification (Film, Documentary, etc.)
+             */
+            $table->string('category', 100)
+                  ->nullable();
+
+            /**
+             * Audit timestamps
+             */
             $table->timestamps();
+
+            /**
+             * Performance indexes
+             */
+            $table->index('title');
+            $table->index('category');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('movies');

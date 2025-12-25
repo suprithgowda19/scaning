@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -20,14 +21,10 @@ class User extends Authenticatable
         'active' => 'boolean',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
-
-    // ✅ REQUIRED — your code expects this
-    public function screens()
+    /**
+     * Screens assigned to staff
+     */
+    public function screens(): BelongsToMany
     {
         return $this->belongsToMany(
             Screen::class,
@@ -35,22 +32,21 @@ class User extends Authenticatable
             'user_id',
             'screen_id'
         )
-            ->withPivot('venue_id', 'active')
-            ->wherePivot('active', true);
+        ->withPivot('venue_id', 'active')
+        ->wherePivot('active', true);
     }
 
-    // ✅ convenience helper
+    /**
+     * Convenience helper
+     */
     public function activeScreen()
     {
         return $this->screens()->first();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Role helpers
-    |--------------------------------------------------------------------------
-    */
-
+    /**
+     * Role helper
+     */
     public function isStaff(): bool
     {
         return $this->hasRole('staff');

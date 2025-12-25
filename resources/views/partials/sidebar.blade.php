@@ -66,7 +66,7 @@
                             <ul class="sidebar-submenu">
                                 <li><a href="{{ route('admin.venues.index') }}">Venues</a></li>
                                 <li><a href="{{ route('admin.screens.index') }}">Screens</a></li>
-                                <li><a href="#">Seats</a></li>
+                                
                                 <li><a href="{{ route('admin.slots.index') }}">Slots</a></li>
                                 <li><a href="{{ route('admin.movies.index') }}">Movies</a></li>
                                 <li><a href="{{ route('admin.ssa.index') }}">Screen Assignments</a></li>

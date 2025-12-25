@@ -2,18 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StaffScreenAssignment extends Model
 {
-    use HasFactory;
-
     protected $table = 'staff_screen_assignments';
 
-    /**
-     * Mass assignable fields.
-     */
     protected $fillable = [
         'user_id',
         'venue_id',
@@ -21,41 +16,22 @@ class StaffScreenAssignment extends Model
         'active',
     ];
 
-    /**
-     * Attribute casting.
-     */
     protected $casts = [
         'active' => 'boolean',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Assigned staff user.
-     */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Venue of assignment.
-     */
-    public function venue()
+    public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
     }
 
-    /**
-     * Screen of assignment.
-     */
-    public function screen()
+    public function screen(): BelongsTo
     {
         return $this->belongsTo(Screen::class);
     }
-
 }

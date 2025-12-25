@@ -6,31 +6,53 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('screens', function (Blueprint $table) {
+
             $table->id();
 
-            $table->foreignId('venue_id')->constrained()->cascadeOnDelete();
+            /**
+             * Venue this screen belongs to
+             */
+            $table->foreignId('venue_id')
+                ->constrained('venues')
+                ->cascadeOnDelete();
 
-            $table->string('name');
-            $table->integer('capacity')->nullable();
+            /**
+             * Scheduler screen identifier
+             * Example: "Audi 9"
+             */
+            $table->string('name', 100);
 
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            /**
+             * Optional human-friendly label
+             */
+            $table->string('display_name', 150)
+                ->nullable();
 
-            // unique per venue so names don’t clash inside same venue
-            $table->unique(['venue_id', 'name']);
+            /**
+             * Physical capacity of the screen
+             * (seat-level logic can replace this later)
+             */
+            $table->unsignedInteger('capacity');
 
+            /**
+             * Audit timestamps
+             */
             $table->timestamps();
+
+            /**
+             * HARD CONSTRAINT
+             * Same screen name cannot repeat inside a venue
+             */
+            $table->unique(
+                ['venue_id', 'name'],
+                'uniq_venue_screen'
+            );
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('screens');

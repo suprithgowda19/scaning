@@ -2,20 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ScreenSlotAssignment extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-        'venue_id',
         'screen_id',
         'slot_id',
         'movie_id',
-        'day',
-        'status',
+        'show_date',
+    ];
+
+    protected $casts = [
+        'show_date' => 'date',
     ];
 
     /*
@@ -24,21 +23,25 @@ class ScreenSlotAssignment extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function venue()
-    {
-        return $this->belongsTo(Venue::class);
-    }
-
+    /**
+     * Physical screen where the show runs
+     */
     public function screen()
     {
         return $this->belongsTo(Screen::class);
     }
 
+    /**
+     * Global time slot (start_time + end_time)
+     */
     public function slot()
     {
         return $this->belongsTo(Slot::class);
     }
 
+    /**
+     * Movie being screened
+     */
     public function movie()
     {
         return $this->belongsTo(Movie::class);
