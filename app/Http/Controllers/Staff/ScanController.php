@@ -13,27 +13,27 @@ use Carbon\Carbon;
 
 class ScanController extends Controller
 {
-    /* ============================
+    /* ==========================================================
      | DASHBOARD
-     ============================ */
+     ========================================================== */
     public function index()
     {
         $staff = auth()->user();
         abort_unless($staff, 401);
 
         $screen = $staff->screens()->first();
-        abort_unless($screen, 403);
+        abort_unless($screen, 403, 'Screen not assigned');
 
         $activeSSA = $this->resolveActiveSSA($screen->id);
-        abort_unless($activeSSA, 403);
+        abort_unless($activeSSA, 403, 'No active show');
 
         $day = $this->resolveFestivalDay();
 
         $stats = ScanLog::where([
-            'screen_id' => $screen->id,
-            'day'       => $day,
-            'slot_id'   => $activeSSA->slot_id,
-        ])
+                'screen_id' => $screen->id,
+                'day'       => $day,
+                'slot_id'   => $activeSSA->slot_id,
+            ])
             ->selectRaw('category, COUNT(*) as count')
             ->groupBy('category')
             ->get();
@@ -52,9 +52,9 @@ class ScanController extends Controller
         ]);
     }
 
-    /* ============================
-     | SCAN API (HOT PATH)
-     ============================ */
+    /* ==========================================================
+     | HOT PATH — SCAN
+     ========================================================== */
     public function scan(Request $request)
     {
         $request->validate(['uuid' => 'required|string']);
@@ -63,7 +63,7 @@ class ScanController extends Controller
         abort_unless($staff, 401);
 
         $screen = $staff->screens()->first();
-        abort_unless($screen, 403);
+        abort_unless($screen, 403, 'Screen not assigned');
 
         $activeSSA = $this->resolveActiveSSA($screen->id);
         if (! $activeSSA) {
@@ -76,12 +76,9 @@ class ScanController extends Controller
         $day   = $this->resolveFestivalDay();
         $value = trim(preg_replace('/^UUID:\s*/i', '', $request->uuid));
 
-        /**
-         * Delegate lookup (index-friendly)
-         */
+        // Index-only lookups
         $delegate =
             DelegateForm::where('uuid', $value)->first()
-            ?? DelegateForm::where('qr_count', $value)->first()
             ?? DelegateForm::where('form_no', $value)->first();
 
         if (! $delegate) {
@@ -91,54 +88,38 @@ class ScanController extends Controller
             ]);
         }
 
-        /**
-         * Duplicate prevention (cheap, indexed)
-         */
-        if (ScanLog::where([
-            'uuid'      => $delegate->uuid,
-            'screen_id' => $screen->id,
-            'day'       => $day,
-            'slot_id'   => $activeSSA->slot_id,
-        ])->exists()) {
-            return response()->json([
-                'status'  => 'duplicate',
-                'message' => 'Already scanned for this show',
-            ]);
-        }
+        try {
+            DB::transaction(function () use ($delegate, $screen, $activeSSA, $day) {
 
-        /**
-         * Capacity check — early stop
-         */
-        $capacityReached = ScanLog::where([
-            'screen_id' => $screen->id,
-            'day'       => $day,
-            'slot_id'   => $activeSSA->slot_id,
-        ])
-            ->limit($screen->capacity)
-            ->count() >= $screen->capacity;
+                $currentCount = ScanLog::where([
+                        'screen_id' => $screen->id,
+                        'day'       => $day,
+                        'slot_id'   => $activeSSA->slot_id,
+                    ])
+                    ->lockForUpdate()
+                    ->count();
 
-        if ($capacityReached) {
+                if ($currentCount >= $screen->capacity) {
+                    throw new \RuntimeException('Screen capacity full');
+                }
+
+                ScanLog::create([
+                    'delegate_form_id' => $delegate->id,
+                    'uuid'             => $delegate->uuid,
+                    'screen_id'        => $screen->id,
+                    'day'              => $day,
+                    'slot_id'          => $activeSSA->slot_id,
+                    'form_no'          => $delegate->form_no,
+                    'category'         => $delegate->category,
+                    'scanned_at'       => now(),
+                ]);
+            });
+        } catch (\RuntimeException $e) {
             return response()->json([
                 'status'  => 'rejected',
-                'message' => 'Screen capacity full',
+                'message' => $e->getMessage(),
             ], 403);
         }
-
-        /**
-         * FAST WRITE PATH (no model hydration)
-         */
-        DB::table('scan_logs')->insert([
-            'delegate_form_id' => $delegate->id,
-            'uuid'             => $delegate->uuid,
-            'screen_id'        => $screen->id,
-            'day'              => $day,
-            'slot_id'          => $activeSSA->slot_id,
-            'form_no'          => $delegate->form_no,
-            'category'         => $delegate->category,
-            'scanned_at'       => now(),
-            'created_at'       => now(),
-            'updated_at'       => now(),
-        ]);
 
         return response()->json([
             'status'   => 'valid',
@@ -148,17 +129,24 @@ class ScanController extends Controller
                 'email'    => $delegate->email,
                 'category' => $delegate->category,
             ],
+            'movie' => [
+                'title'    => $activeSSA->movie->title,
+                'language' => $activeSSA->movie->language,
+                'duration' => $activeSSA->movie->duration,
+            ],
+            'slot' => [
+                'start_time' => $activeSSA->slot->start_time,
+            ],
         ]);
     }
 
-    /* ============================
-     | HELPERS (MAX OPTIMIZED)
-     ============================ */
+    /* ==========================================================
+     | HELPERS
+     ========================================================== */
 
     private function resolveFestivalDay(): int
     {
         static $day = null;
-
         if ($day !== null) {
             return $day;
         }
@@ -184,7 +172,7 @@ class ScanController extends Controller
             ->select(['id', 'slot_id', 'movie_id'])
             ->with([
                 'slot:id,start_time',
-                'movie:id,duration',
+                'movie:id,title,language,duration',
             ])
             ->where('screen_id', $screenId)
             ->get()

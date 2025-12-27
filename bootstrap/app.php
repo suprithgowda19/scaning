@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'active.user' => \App\Http\Middleware\EnsureUserIsActive::class,
             'redirect.logged' => \App\Http\Middleware\RedirectIfLoggedIn::class,
+            'scan.token' => \App\Http\Middleware\ScanTokenMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
