@@ -17,21 +17,16 @@ class ScanLog extends Model
      * Mass assignable fields
      */
     protected $fillable = [
-        'delegate_form_id',
-        'uuid',
-        'screen_id',
+    'scheduler_id',
+    'delegate_form_id',
+    'uuid',
+    'form_no',
+    'category',
+    'screen_id',
+    'scanned_by',
+    'scanned_at',
+];
 
-        // SSA snapshot
-        'day',
-        'slot_id',
-
-        // Denormalized snapshot
-        'form_no',
-        'category',
-
-        'status',
-        'scanned_at',
-    ];
 
     /**
      * Attribute casting
@@ -61,5 +56,11 @@ class ScanLog extends Model
     public function slot()
     {
         return $this->belongsTo(Slot::class, 'slot_id');
+    }
+    public function screenSlotAssignment()
+    {
+        return $this->belongsTo(ScreenSlotAssignment::class, 'day', 'day')
+            ->whereColumn('screen_id', 'screen_id')
+            ->whereColumn('slot_id', 'slot_id');
     }
 }

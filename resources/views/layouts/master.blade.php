@@ -9,16 +9,18 @@
     <meta name="author" content="pixelstrap">
 
     {{-- Favicon --}}
-    <link rel="icon" href="{{ asset('assets/images/BBMPlogo.png') }}" type="image/x-icon">
-    <link rel="shortcut icon" href="{{ asset('assets/images/BBMPlogo.png') }}" type="image/x-icon">
+    <link rel="icon" href="{{ asset('assets/images/biffeslogo2.png') }}" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ asset('assets/images/biffeslogo2.png') }}" type="image/x-icon">
 
     <title>@yield('title', 'Admin Dashboard')</title>
 
     {{-- Google Fonts --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap"
+        rel="stylesheet">
 
     {{-- Zeta Icon Libraries --}}
     <link rel="stylesheet" href="{{ asset('assets/css/vendors/font-awesome.css') }}">
@@ -66,25 +68,27 @@
             <div class="page-body">
 
                 {{-- PAGE HEADER --}}
-                <div class="container-fluid">
-                    <div class="page-title">
-                        <div class="row">
-                            <div class="col-12 col-sm-6">
-                                <h3>@yield('page_title')</h3>
-                            </div>
-                            <div class="col-12 col-sm-6">
-                                <ol class="breadcrumb">
-                                    <li class="breadcrumb-item">
-                                        <a href="{{ url('/') }}">
-                                            <i data-feather="home"></i>
-                                        </a>
-                                    </li>
-                                    @yield('breadcrumb')
-                                </ol>
+                @role('admin')
+                    <div class="container-fluid">
+                        <div class="page-title">
+                            <div class="row">
+                                <div class="col-12 col-sm-6">
+                                    <h3>@yield('page_title')</h3>
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <ol class="breadcrumb">
+                                        <li class="breadcrumb-item">
+                                            <a href="{{ url('/') }}">
+                                                <i data-feather="home"></i>
+                                            </a>
+                                        </li>
+                                        @yield('breadcrumb')
+                                    </ol>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                @endrole
 
                 {{-- Flash Messages --}}
                 @if (session('success'))
@@ -135,4 +139,5 @@
     @stack('scripts')
 
 </body>
+
 </html>

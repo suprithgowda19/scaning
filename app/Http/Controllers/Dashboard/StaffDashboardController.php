@@ -4,99 +4,91 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\ScanLog;
+use App\Models\Slot;
+use App\Models\Movie;
+use App\Models\ScreenSlotAssignment;
+use App\Exports\StaffScanLogsExport;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Exports\ScanLogsExport;
 
 class StaffDashboardController extends Controller
 {
     /**
-     * Staff Dashboard
-     * - Normal page load → Blade
-     * - AJAX → DataTable JSON
+     * Staff Scan Reports (Table + Filters)
      */
     public function index(Request $request)
     {
         $staff = auth()->user();
-        if (! $staff) {
-            abort(401);
-        }
+        abort_unless($staff, 401);
 
-        // SECURITY: screen-scoped
+        // Resolve assigned screen
         $screen = $staff->screens()->first();
-        if (! $screen) {
-            abort(403, 'Screen not assigned');
+        abort_unless($screen, 403, 'Screen not assigned');
+
+        /* ============================
+         | BASE QUERY (SCREEN-LOCKED)
+         ============================ */
+        $query = ScanLog::with([
+            'delegate:id,firstname,lastname,phone',
+            'slot:id,start_time',
+            'screenSlotAssignment.movie:id,title',
+        ])
+        ->where('screen_id', $screen->id);
+
+        /* ============================
+         | FILTERS
+         ============================ */
+        if ($request->filled('day')) {
+            $query->where('day', $request->day);
         }
 
-        /* ======================
-         | AJAX REQUEST (DataTable)
-         ====================== */
-        if ($request->ajax()) {
-            return $this->datatableResponse($request, $screen->id);
+        if ($request->filled('slot_id')) {
+            $query->where('slot_id', $request->slot_id);
         }
 
-        /* ======================
-         | DASHBOARD STATS
-         ====================== */
-        $entered = ScanLog::where('screen_id', $screen->id)->count();
-
-        $categories = ScanLog::where('screen_id', $screen->id)
-            ->select('category', DB::raw('COUNT(*) as count'))
-            ->groupBy('category')
-            ->pluck('count', 'category')
-            ->toArray();
-
-        $stats = [
-            'capacity'   => $screen->capacity,
-            'entered'    => $entered,
-            'remaining'  => max(0, $screen->capacity - $entered),
-            'categories' => $categories,
-        ];
-
-        return view('dashboard.staff.index', compact('stats'));
-    }
-
-    /**
-     * DataTable JSON response
-     */
-    protected function datatableResponse(Request $request, int $screenId)
-    {
-        $query = ScanLog::with('delegate')
-            ->where('screen_id', $screenId);
-
-        // Date filter
-        if ($request->filled('date')) {
-            $query->whereDate('scanned_at', $request->date);
+        if ($request->filled('movie_id')) {
+            $query->whereHas('screenSlotAssignment', function ($q) use ($request) {
+                $q->where('movie_id', $request->movie_id);
+            });
         }
 
-        // Category filter
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
-
+        /* ============================
+         | DATA
+         ============================ */
         $logs = $query
             ->orderByDesc('scanned_at')
+            ->limit(2000)
             ->get();
 
-        $data = [];
-        foreach ($logs as $index => $log) {
-            $data[] = [
-                'index'      => $index + 1,
-                'form_no'    => $log->form_no,
-                'name'       => optional($log->delegate)
-                                    ? trim($log->delegate->firstname . ' ' . $log->delegate->lastname)
-                                    : '-',
-                'phone'      => $log->delegate->phone ?? '-',
-                'category'   => $log->category,
-                'status'     => ucfirst($log->status),
-                'scanned_at' => optional($log->scanned_at)->format('Y-m-d H:i:s'),
-            ];
-        }
+        /* ============================
+         | FILTER DROPDOWNS (SCREEN-SCOPED)
+         ============================ */
 
-        return response()->json([
-            'data' => $data
+        // Slots used by this screen
+        $slots = Slot::whereIn(
+            'id',
+            ScreenSlotAssignment::where('screen_id', $screen->id)
+                ->distinct()
+                ->pluck('slot_id')
+        )
+        ->orderBy('start_time')
+        ->get(['id', 'start_time']);
+
+        // Movies used by this screen
+        $movies = Movie::whereIn(
+            'id',
+            ScreenSlotAssignment::where('screen_id', $screen->id)
+                ->distinct()
+                ->pluck('movie_id')
+        )
+        ->orderBy('title')
+        ->get(['id', 'title']);
+
+        return view('dashboard.staff.index', [
+            'logs'    => $logs,
+            'slots'   => $slots,
+            'movies'  => $movies,
+            'filters' => $request->only(['day', 'slot_id', 'movie_id']),
         ]);
     }
 
@@ -105,53 +97,36 @@ class StaffDashboardController extends Controller
      */
     public function exportExcel(Request $request)
     {
-        return Excel::download(
-            new ScanLogsExport($this->exportQuery($request)),
-            'scan_logs.xlsx'
-        );
-    }
-
-    /**
-     * Export PDF (same filters)
-     */
-    public function exportPdf(Request $request)
-    {
-        $logs = $this->exportQuery($request)->get();
-
-        $pdf = Pdf::loadView(
-            'dashboard.staff.exports.scans_pdf',
-            compact('logs')
-        )->setPaper('a4', 'landscape');
-
-        return $pdf->download('scan_logs.pdf');
-    }
-
-    /**
-     * Shared query for exports
-     */
-    protected function exportQuery(Request $request)
-    {
         $staff = auth()->user();
-        if (! $staff) {
-            abort(401);
-        }
+        abort_unless($staff, 401);
 
         $screen = $staff->screens()->first();
-        if (! $screen) {
-            abort(403);
+        abort_unless($screen, 403);
+
+        $query = ScanLog::with([
+            'delegate:id,firstname,lastname,phone',
+            'slot:id,start_time',
+            'screenSlotAssignment.movie:id,title',
+        ])
+        ->where('screen_id', $screen->id);
+
+        if ($request->filled('day')) {
+            $query->where('day', $request->day);
         }
 
-        $query = ScanLog::with('delegate')
-            ->where('screen_id', $screen->id);
-
-        if ($request->filled('date')) {
-            $query->whereDate('scanned_at', $request->date);
+        if ($request->filled('slot_id')) {
+            $query->where('slot_id', $request->slot_id);
         }
 
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
+        if ($request->filled('movie_id')) {
+            $query->whereHas('screenSlotAssignment', function ($q) use ($request) {
+                $q->where('movie_id', $request->movie_id);
+            });
         }
 
-        return $query->orderByDesc('scanned_at');
+        return Excel::download(
+            new StaffScanLogsExport($query),
+            'staff_scan_reports.xlsx'
+        );
     }
 }

@@ -8,7 +8,8 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
-class ScanLogsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
+
+class StaffScanLogsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
 {
     protected Builder $query;
 

@@ -45,21 +45,6 @@
                                 @enderror
                             </div>
 
-                            {{-- ADDRESS --}}
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Address</label>
-                                <textarea class="form-control @error('address') is-invalid @enderror"
-                                          name="address"
-                                          rows="3"
-                                          placeholder="Enter venue address">{{ old('address', $venue->address) }}</textarea>
-
-                                @error('address')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @else
-                                    <div class="invalid-feedback">Please enter a valid address.</div>
-                                @enderror
-                            </div>
-
                        
                         </div>
                     </div>

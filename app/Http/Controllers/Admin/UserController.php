@@ -73,7 +73,7 @@ class UserController extends Controller
         $user->load([
             'roles:id,name',
             'screens:id,name,venue_id',
-            'screens.venue:id,name,address',
+            'screens.venue:id,name',
         ]);
 
         return view('admin.users.show', compact('user'));

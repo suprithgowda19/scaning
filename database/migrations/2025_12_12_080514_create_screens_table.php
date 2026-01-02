@@ -6,31 +6,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('screens', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('venue_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('venue_id')
+                ->constrained('venues')
+                ->restrictOnDelete();
 
             $table->string('name');
-            $table->integer('capacity')->nullable();
+            $table->unsignedInteger('capacity');
 
-            $table->enum('status', ['active', 'inactive'])->default('active');
-
-            // unique per venue so names don’t clash inside same venue
             $table->unique(['venue_id', 'name']);
+            $table->index('venue_id');
 
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('screens');

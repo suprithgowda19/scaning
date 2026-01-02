@@ -44,7 +44,7 @@
             <tr>
                 <th>Sl.No</th>
                 <th>Venue Name</th>
-                <th>Address</th>
+                
                 <th class="text-center">Actions</th>
             </tr>
         </thead>
@@ -56,7 +56,7 @@
 
                     <td>{{ $venue->name }}</td>
 
-                    <td>{{ $venue->address ?? 'N/A' }}</td>
+                  
 
                     <td class="text-center">
                         <div class="d-flex justify-content-center gap-2">

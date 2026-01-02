@@ -13,13 +13,10 @@ class RedirectIfLoggedIn
 
             $previous = url()->previous();
 
-            // If previous page exists AND is not login itself
             if ($previous && $previous !== route('login')) {
                 return redirect()->to($previous);
             }
 
-            // If login was opened directly (new tab / refresh),
-            // just go back in browser history
             return redirect()->back();
         }
 

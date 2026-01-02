@@ -41,12 +41,12 @@
                     {{-- ========================= --}}
                     <li class="sidebar-list">
                         @role('admin')
-                            <a class="sidebar-link sidebar-title link-nav" href="">
+                            <a class="sidebar-link sidebar-title link-nav" href="{{ route('dashboard.admin.index') }}">
                                 <i data-feather="grid"></i>
                                 <span>Dashboard</span>
                             </a>
                         @else
-                            <a class="sidebar-link sidebar-title link-nav" href="{{ route('staff.dashboard') }}">
+                            <a class="sidebar-link sidebar-title link-nav" href="{{ route('dashboard.staff.index') }}">
                                 <i data-feather="grid"></i>
                                 <span>Dashboard</span>
                             </a>
@@ -66,10 +66,9 @@
                             <ul class="sidebar-submenu">
                                 <li><a href="{{ route('admin.venues.index') }}">Venues</a></li>
                                 <li><a href="{{ route('admin.screens.index') }}">Screens</a></li>
-                                <li><a href="#">Seats</a></li>
-                                <li><a href="{{ route('admin.slots.index') }}">Slots</a></li>
-                                <li><a href="{{ route('admin.movies.index') }}">Movies</a></li>
-                                <li><a href="{{ route('admin.ssa.index') }}">Screen Assignments</a></li>
+                                
+
+                                <li><a href="">Scheduler</a></li>
                             </ul>
                         </li>
                     @endrole

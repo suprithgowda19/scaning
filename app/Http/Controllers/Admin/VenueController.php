@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Venue;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class VenueController extends Controller
 {
     /**
      * Display a listing of venues.
-     * Frontend (DataTables) handles search, sorting, pagination.
      */
     public function index()
     {
@@ -32,17 +32,16 @@ class VenueController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'name'    => ['required', 'string', 'max:255', 'unique:venues,name'],
-            'address' => ['nullable', 'string'],
-         
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                'unique:venues,name',
+            ],
         ]);
 
-        Venue::create([
-            'name'    => $request->name,
-            'address' => $request->address,
-            'active'  => $request->boolean('active'),
-        ]);
+        Venue::create($validated);
 
         return redirect()
             ->route('admin.venues.index')
@@ -50,33 +49,36 @@ class VenueController extends Controller
     }
 
     /**
-     * Show the form for editing a venue.
+     * Display the specified venue.
      */
-    public function edit($id)
+    public function show(Venue $venue)
     {
-        $venue = Venue::findOrFail($id);
+        return view('admin.venues.show', compact('venue'));
+    }
 
+    /**
+     * Show the form for editing the specified venue.
+     */
+    public function edit(Venue $venue)
+    {
         return view('admin.venues.edit', compact('venue'));
     }
 
     /**
-     * Update a venue.
+     * Update the specified venue.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, Venue $venue)
     {
-        $request->validate([
-            'name'    => ['required', 'string', 'max:255', 'unique:venues,name,' . $id],
-            'address' => ['nullable', 'string'],
-         
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('venues', 'name')->ignore($venue->id),
+            ],
         ]);
 
-        $venue = Venue::findOrFail($id);
-
-        $venue->update([
-            'name'    => $request->name,
-            'address' => $request->address,
-         
-        ]);
+        $venue->update($validated);
 
         return redirect()
             ->route('admin.venues.index')
@@ -84,11 +86,17 @@ class VenueController extends Controller
     }
 
     /**
-     * Delete a venue.
+     * Remove the specified venue.
      */
-    public function destroy($id)
+    public function destroy(Venue $venue)
     {
-        $venue = Venue::findOrFail($id);
+        // Hard delete is safe ONLY if no screens exist
+        if ($venue->screens()->exists()) {
+            return redirect()
+                ->route('admin.venues.index')
+                ->with('error', 'Cannot delete venue with screens. Remove screens first.');
+        }
+
         $venue->delete();
 
         return redirect()
