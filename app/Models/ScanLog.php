@@ -9,7 +9,8 @@ class ScanLog extends Model
     protected $table = 'scan_logs';
 
     /**
-     * Enable timestamps (created_at / updated_at)
+     * We still keep created_at / updated_at,
+     * but scanned_at is the real business timestamp
      */
     public $timestamps = true;
 
@@ -17,50 +18,59 @@ class ScanLog extends Model
      * Mass assignable fields
      */
     protected $fillable = [
-    'scheduler_id',
-    'delegate_form_id',
-    'uuid',
-    'form_no',
-    'category',
-    'screen_id',
-    'scanned_by',
-    'scanned_at',
-];
-
+        'scheduler_id',
+        'delegate_form_id',
+        'uuid',
+        'form_no',
+        'category',
+        'screen_id',
+        'scanned_by',
+        'scanned_at',
+    ];
 
     /**
      * Attribute casting
      */
     protected $casts = [
         'scanned_at' => 'datetime',
-        'day'        => 'integer',
-        'slot_id'    => 'integer',
     ];
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships (SAFE ONLY)
+    | Relationships (SCHEDULER-CENTRIC)
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * The show (scheduler) this scan belongs to
+     */
+    public function scheduler()
+    {
+        return $this->belongsTo(Scheduler::class);
+    }
+
+    /**
+     * Delegate who was scanned
+     */
     public function delegate()
     {
         return $this->belongsTo(DelegateForm::class, 'delegate_form_id');
     }
 
+    /**
+     * Screen where the scan happened
+     * (denormalized for fast queries)
+     */
     public function screen()
     {
         return $this->belongsTo(Screen::class, 'screen_id');
     }
 
-    public function slot()
+    /**
+     * Staff member who scanned
+     */
+    public function scannedBy()
     {
-        return $this->belongsTo(Slot::class, 'slot_id');
-    }
-    public function screenSlotAssignment()
-    {
-        return $this->belongsTo(ScreenSlotAssignment::class, 'day', 'day')
-            ->whereColumn('screen_id', 'screen_id')
-            ->whereColumn('slot_id', 'slot_id');
+        return $this->belongsTo(User::class, 'scanned_by');
     }
 }

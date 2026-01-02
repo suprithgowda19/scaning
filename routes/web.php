@@ -43,12 +43,13 @@ Route::post('/logout', [LoginController::class, 'logout'])
 | Common Auth
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->get('/profile', [UserController::class, 'profile'])
+Route::middleware('auth')
+    ->get('/profile', [UserController::class, 'profile'])
     ->name('profile.show');
 
 /*
 |--------------------------------------------------------------------------
-| Admin Panel
+| Admin Panel (Configuration)
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'active.user', 'role:admin'])
@@ -94,7 +95,7 @@ Route::middleware(['auth', 'role:staff', 'active.user'])
 
 /*
 |--------------------------------------------------------------------------
-| Staff Dashboard
+| Staff Dashboard (Reports)
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:staff'])
@@ -105,13 +106,17 @@ Route::middleware(['auth', 'role:staff'])
         Route::get('/', [StaffDashboardController::class, 'index'])
             ->name('index');
 
-        Route::get('/export/excel', [StaffDashboardController::class, 'exportExcel'])
+        // ✅ THIS LINE MUST EXIST
+        Route::get('ajax/filter', [StaffDashboardController::class, 'ajaxFilter'])
+            ->name('ajax.filter');
+
+        Route::get('export/excel', [StaffDashboardController::class, 'exportExcel'])
             ->name('export.excel');
     });
 
 /*
 |--------------------------------------------------------------------------
-| Admin Dashboard
+| Admin Dashboard (AJAX + Reports)
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:admin'])
@@ -119,9 +124,19 @@ Route::middleware(['auth', 'role:admin'])
     ->name('dashboard.admin.')
     ->group(function () {
 
+        // Main dashboard page
         Route::get('/', [AdminDashboardController::class, 'index'])
             ->name('index');
 
-        Route::get('/export/excel', [AdminDashboardController::class, 'exportExcel'])
+        // 🔥 AJAX: filter logs + update slots dynamically
+        Route::get('/ajax/filter', [AdminDashboardController::class, 'ajaxFilter'])
+            ->name('ajax.filter');
+
+        // 🔥 AJAX: slots for given day + screen (used by UI)
+        Route::get('/screen-slots', [AdminDashboardController::class, 'screenSlots'])
+            ->name('screen.slots');
+
+        // Excel export (same filters)
+        Route::get('/export', [AdminDashboardController::class, 'exportExcel'])
             ->name('export.excel');
     });

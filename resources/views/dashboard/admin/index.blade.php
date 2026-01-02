@@ -1,153 +1,157 @@
 @extends('layouts.master')
 
-@section('title', 'Admin Scan Reports')
-@section('page_title', 'Admin Scan Reports')
-
-@section('breadcrumb')
-    <li class="breadcrumb-item active">Admin Reports</li>
-@endsection
-
-@push('css')
-<style>
-    .filter-row select {
-        height: 36px;
-        font-size: 13px;
-    }
-    table td {
-        font-size: 13px;
-        vertical-align: middle;
-    }
-</style>
-@endpush
-
 @section('content')
 <div class="container-fluid">
 
-<form method="GET" action="{{ route('dashboard.admin.index') }}">
-
-    {{-- ================= FILTERS ================= --}}
-    <div class="row g-2 mb-2 filter-row">
-
-        <div class="col-md-2">
-            <label class="form-label">Day</label>
-            <select name="day" class="form-select">
-                <option value="">All Days</option>
-                @for ($i = 1; $i <= 7; $i++)
-                    <option value="{{ $i }}" {{ ($filters['day'] ?? '') == $i ? 'selected' : '' }}>
-                        Day {{ $i }}
-                    </option>
-                @endfor
-            </select>
-        </div>
-
-        <div class="col-md-3">
-            <label class="form-label">Screen</label>
-            <select name="screen_id" class="form-select">
-                <option value="">All Screens</option>
-                @foreach ($screens as $screen)
-                    <option value="{{ $screen->id }}"
-                        {{ ($filters['screen_id'] ?? '') == $screen->id ? 'selected' : '' }}>
-                        {{ $screen->name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
-        <div class="col-md-2">
-            <label class="form-label">Slot</label>
-            <select name="slot_id" class="form-select">
-                <option value="">All Slots</option>
-                @foreach ($slots as $slot)
-                    <option value="{{ $slot->id }}"
-                        {{ ($filters['slot_id'] ?? '') == $slot->id ? 'selected' : '' }}>
-                        {{ $slot->start_time }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
-        <div class="col-md-3">
-            <label class="form-label">Movie</label>
-            <select name="movie_id" class="form-select">
-                <option value="">All Movies</option>
-                @foreach ($movies as $movie)
-                    <option value="{{ $movie->id }}"
-                        {{ ($filters['movie_id'] ?? '') == $movie->id ? 'selected' : '' }}>
-                        {{ $movie->title }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
+{{-- FILTERS --}}
+<div class="row g-2 mb-2">
+    <div class="col-md-2">
+        <select id="show_date" class="form-select">
+            <option value="">All Days</option>
+            @foreach ($dates as $date)
+                <option value="{{ $date }}">
+                    {{ \Carbon\Carbon::parse($date)->format('d M Y') }}
+                </option>
+            @endforeach
+        </select>
     </div>
 
-    {{-- ================= ACTION BUTTONS ================= --}}
-    <div class="row mb-3">
-        <div class="col-md-6 d-flex gap-2">
-            <button type="submit" class="btn btn-primary">
-                Apply
-            </button>
-
-            <a href="{{ route('dashboard.admin.index') }}"
-               class="btn btn-primary btn-outline">
-                Reset
-            </a>
-
-            {{-- ✅ FIXED ROUTE --}}
-            <a href="{{ route('dashboard.admin.export.excel', request()->query()) }}"
-               class="btn btn-success">
-                Export Excel
-            </a>
-        </div>
+    <div class="col-md-2">
+        <select id="screen_id" class="form-select">
+            <option value="">All Screens</option>
+            @foreach ($screens as $screen)
+                <option value="{{ $screen->id }}">{{ $screen->name }}</option>
+            @endforeach
+        </select>
     </div>
 
-</form>
+    <div class="col-md-2">
+        <select id="slot_no" class="form-select">
+            <option value="">All Slots</option>
+        </select>
+    </div>
 
-{{-- ================= TABLE ================= --}}
+    <div class="col-md-3">
+        <select id="movie_title" class="form-select">
+            <option value="">All Movies</option>
+            @foreach ($movies as $movie)
+                <option value="{{ $movie }}">{{ $movie }}</option>
+            @endforeach
+        </select>
+    </div>
+</div>
+
+{{-- ACTIONS --}}
+<div class="mb-3 d-flex gap-2">
+    <button class="btn btn-primary" onclick="loadData()">Apply</button>
+    <button class="btn btn-outline-secondary" onclick="resetFilters()">Reset</button>
+    <a id="exportLink" class="btn btn-success" target="_blank">Export Excel</a>
+</div>
+
+{{-- TABLE --}}
 <div class="card">
 <div class="card-body table-responsive">
-
 <table class="table table-bordered table-striped">
-<thead class="table-light">
+<thead>
 <tr>
     <th>#</th>
     <th>Form No</th>
     <th>Name</th>
-    <th>Phone</th>
-    <th>Category</th>
     <th>Screen</th>
     <th>Movie</th>
     <th>Slot</th>
-    <th>Day</th>
     <th>Scanned At</th>
 </tr>
 </thead>
-<tbody>
-@forelse ($logs as $index => $log)
+<tbody id="table-body">
 <tr>
-    <td>{{ $index + 1 }}</td>
-    <td>{{ $log->form_no }}</td>
-    <td>{{ optional($log->delegate)?->firstname }} {{ optional($log->delegate)?->lastname }}</td>
-    <td>{{ $log->delegate->phone ?? '-' }}</td>
-    <td>{{ $log->category }}</td>
-    <td>{{ $log->screen->name ?? '-' }}</td>
-    <td>{{ $log->screenSlotAssignment?->movie?->title ?? '-' }}</td>
-    <td>{{ $log->slot->start_time ?? '-' }}</td>
-    <td>Day {{ $log->day }}</td>
-    <td>{{ optional($log->scanned_at)->format('Y-m-d H:i:s') }}</td>
+    <td colspan="7" class="text-center text-muted">Loading…</td>
 </tr>
-@empty
-<tr>
-    <td colspan="10" class="text-center text-muted">
-        No records found
-    </td>
-</tr>
-@endforelse
 </tbody>
 </table>
-
 </div>
 </div>
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+const dateEl   = document.getElementById('show_date');
+const screenEl = document.getElementById('screen_id');
+const slotEl   = document.getElementById('slot_no');
+const movieEl  = document.getElementById('movie_title');
+const tbody    = document.getElementById('table-body');
+const exportEl = document.getElementById('exportLink');
+
+function loadData() {
+    const params = {
+        show_date: dateEl.value,
+        screen_id: screenEl.value,
+        slot_no: slotEl.value,
+        movie_title: movieEl.value
+    };
+
+    exportEl.href = `{{ route('dashboard.admin.export.excel') }}?`
+        + new URLSearchParams(params);
+
+    fetch(`{{ route('dashboard.admin.ajax.filter') }}?`
+        + new URLSearchParams(params))
+        .then(r => r.json())
+        .then(res => {
+            renderTable(res.logs);
+            updateSlots(res.slots);
+        });
+}
+
+function renderTable(logs) {
+    tbody.innerHTML = '';
+
+    if (!logs.length) {
+        tbody.innerHTML =
+            `<tr><td colspan="7" class="text-center text-muted">No records found</td></tr>`;
+        return;
+    }
+
+    logs.forEach((log, i) => {
+        tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${log.form_no ?? '-'}</td>
+                <td>${log.delegate?.firstname ?? ''}</td>
+                <td>${log.screen?.name ?? '-'}</td>
+                <td>${log.scheduler?.movie_title ?? '-'}</td>
+                <td>Slot ${log.slot_no}</td>
+                <td>${log.scanned_at ?? '-'}</td>
+            </tr>
+        `);
+    });
+}
+
+function updateSlots(slots) {
+    const current = slotEl.value;
+    slotEl.innerHTML = '<option value="">All Slots</option>';
+
+    slots.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.slot_no;
+        opt.textContent = s.label;
+        if (current == s.slot_no) opt.selected = true;
+        slotEl.appendChild(opt);
+    });
+}
+
+function resetFilters() {
+    dateEl.value = '';
+    screenEl.value = '';
+    slotEl.value = '';
+    movieEl.value = '';
+    loadData();
+}
+
+dateEl.addEventListener('change', loadData);
+screenEl.addEventListener('change', loadData);
+
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+@endpush
