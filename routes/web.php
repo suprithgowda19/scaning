@@ -15,49 +15,25 @@ use App\Http\Controllers\Dashboard\{
     StaffDashboardController,
     AdminDashboardController
 };
-
-/*
-|--------------------------------------------------------------------------
-| Public
-|--------------------------------------------------------------------------
-*/
-Route::get('/', fn () => redirect()->route('login'));
-
-/*
-|--------------------------------------------------------------------------
-| Authentication
-|--------------------------------------------------------------------------
-*/
+Route::get('/', fn() => redirect()->route('login'));
 Route::get('/login', [LoginController::class, 'showLoginForm'])
     ->middleware('redirect.logged')
     ->name('login');
-
 Route::post('/login', [LoginController::class, 'login']);
-
 Route::post('/logout', [LoginController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
-/*
-|--------------------------------------------------------------------------
-| Common Auth
-|--------------------------------------------------------------------------
-*/
 Route::middleware('auth')
     ->get('/profile', [UserController::class, 'profile'])
     ->name('profile.show');
 
-/*
-|--------------------------------------------------------------------------
-| Admin Panel (Configuration)
-|--------------------------------------------------------------------------
-*/
 Route::middleware(['auth', 'active.user', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
 
-        Route::resource('users', UserController::class);
+        Route::resource('users', UserController::class)->except(['show']);
         Route::post('/users/toggle-status', [UserController::class, 'toggleStatus'])
             ->name('users.toggle-status');
 
@@ -74,30 +50,24 @@ Route::middleware(['auth', 'active.user', 'role:admin'])
         Route::resource('staff-assignments', StaffScreenAssignmentController::class);
     });
 
-/*
-|--------------------------------------------------------------------------
-| Staff Scanning (SESSION-BASED — FINAL)
-|--------------------------------------------------------------------------
-*/
+Route::middleware(['auth', 'active.user'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+
+        Route::get('/users/{user}', [UserController::class, 'show'])
+            ->name('users.show');
+    });
 Route::middleware(['auth', 'role:staff', 'active.user'])
     ->prefix('staff')
     ->name('staff.')
     ->group(function () {
-
-        // Scan dashboard
         Route::get('/scan', [ScanController::class, 'index'])
             ->name('scan.index');
 
-        // Scan action
         Route::post('/scan', [ScanController::class, 'scan'])
             ->name('scan.store');
     });
-
-/*
-|--------------------------------------------------------------------------
-| Staff Dashboard (Reports)
-|--------------------------------------------------------------------------
-*/
 Route::middleware(['auth', 'role:staff'])
     ->prefix('dashboard/staff')
     ->name('dashboard.staff.')
@@ -105,38 +75,24 @@ Route::middleware(['auth', 'role:staff'])
 
         Route::get('/', [StaffDashboardController::class, 'index'])
             ->name('index');
-
-        // ✅ THIS LINE MUST EXIST
         Route::get('ajax/filter', [StaffDashboardController::class, 'ajaxFilter'])
             ->name('ajax.filter');
 
         Route::get('export/excel', [StaffDashboardController::class, 'exportExcel'])
             ->name('export.excel');
     });
-
-/*
-|--------------------------------------------------------------------------
-| Admin Dashboard (AJAX + Reports)
-|--------------------------------------------------------------------------
-*/
 Route::middleware(['auth', 'role:admin'])
     ->prefix('dashboard/admin')
     ->name('dashboard.admin.')
     ->group(function () {
 
-        // Main dashboard page
         Route::get('/', [AdminDashboardController::class, 'index'])
             ->name('index');
-
-        // 🔥 AJAX: filter logs + update slots dynamically
         Route::get('/ajax/filter', [AdminDashboardController::class, 'ajaxFilter'])
             ->name('ajax.filter');
-
-        // 🔥 AJAX: slots for given day + screen (used by UI)
         Route::get('/screen-slots', [AdminDashboardController::class, 'screenSlots'])
             ->name('screen.slots');
 
-        // Excel export (same filters)
         Route::get('/export', [AdminDashboardController::class, 'exportExcel'])
             ->name('export.excel');
     });

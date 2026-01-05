@@ -60,11 +60,12 @@
             </tr>
         </table>
     </div>
-
+    @role('admin')
     <div class="card-footer text-end">
         <a href="{{ route('admin.users.index') }}" class="btn btn-secondary">
             Back
         </a>
     </div>
+    @endrole
 </div>
 @endsection

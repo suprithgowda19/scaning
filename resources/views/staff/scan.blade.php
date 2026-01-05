@@ -202,11 +202,10 @@ input.addEventListener('keydown', async (e) => {
                 </div>
             `;
 
-            // 🔥 LIVE KPI UPDATE (SERVER TRUTH)
             enteredEl.textContent = data.stats.entered;
             remainEl.textContent  = data.stats.remaining;
 
-            // 🔥 LIVE CATEGORY UPDATE
+            
             for (const [category, count] of Object.entries(data.stats.categories)) {
                 const el = document.querySelector(`[data-category="${category}"]`);
                 if (el) el.textContent = count;

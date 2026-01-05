@@ -1,7 +1,6 @@
 <div class="sidebar-wrapper">
     <div>
 
-        {{-- LOGO --}}
         <div class="logo-wrapper">
             <a href="">
                 <img class="img-fluid for-light" src="{{ asset('assets/images/newimages/headernewlogo16biffes.png') }}"
@@ -11,8 +10,6 @@
             </a>
             <div class="back-btn"><i class="fa fa-angle-left"></i></div>
         </div>
-
-        {{-- Mobile Logo Icon --}}
         <div class="logo-icon-wrapper">
             <a href="">
                 <img class="img-fluid" src="{{ asset('assets/images/logo-icon.png') }}" alt="">
@@ -25,7 +22,7 @@
             <div id="sidebar-menu">
                 <ul class="sidebar-links" id="simple-bar">
 
-                    {{-- Mobile back --}}
+                   
                     <li class="back-btn">
                         <a href="">
                             <img class="img-fluid" src="{{ asset('assets/images/logo-icon.png') }}" alt="">
@@ -35,10 +32,6 @@
                             <i class="fa fa-angle-right ps-2"></i>
                         </div>
                     </li>
-
-                    {{-- ========================= --}}
-                    {{-- DASHBOARD --}}
-                    {{-- ========================= --}}
                     <li class="sidebar-list">
                         @role('admin')
                             <a class="sidebar-link sidebar-title link-nav" href="{{ route('dashboard.admin.index') }}">
@@ -52,11 +45,6 @@
                             </a>
                         @endrole
                     </li>
-
-
-
-
-
                     @role('admin')
                         <li class="sidebar-list">
                             <a class="sidebar-link sidebar-title" href="javascript:void(0)">
@@ -68,13 +56,10 @@
                                 <li><a href="{{ route('admin.screens.index') }}">Screens</a></li>
                                 
 
-                                <li><a href="">Scheduler</a></li>
+                                <li><a href="{{ route('admin.schedulers.index') }}">Scheduler</a></li>
                             </ul>
                         </li>
                     @endrole
-
-
-
                     @role('admin')
                         <li class="sidebar-list">
                             <a class="sidebar-link sidebar-title link-nav"
@@ -85,14 +70,6 @@
                         </li>
                     @endrole
 
-
-
-
-
-                    {{-- ========================= --}}
-                    {{-- USERS (Admin Only) --}}
-                    {{-- ========================= --}}
-
                     @role('admin')
                         <li class="sidebar-list">
                             <a class="sidebar-link sidebar-title link-nav" href="{{ route('admin.users.index') }}">
@@ -101,16 +78,10 @@
                             </a>
                         </li>
                     @endrole
-
-
-                    {{-- ========================= --}}
-                    {{-- PROFILE --}}
-                    {{-- ========================= --}}
-
                     @role('staff')
                         <li class="sidebar-list">
                             <a class="sidebar-link sidebar-title link-nav"
-                                href="{{ route('profile.show', auth()->id()) }}">
+                                href="{{ route('admin.users.show', auth()->id()) }}">
                                 <i data-feather="user"></i>
                                 <span>Profile</span>
                             </a>

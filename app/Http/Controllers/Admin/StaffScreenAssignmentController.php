@@ -8,13 +8,9 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Models\Screen;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class StaffScreenAssignmentController extends Controller
 {
-    /**
-     * List assignments
-     */
     public function index()
     {
         $assignments = StaffScreenAssignment::with([
@@ -28,15 +24,9 @@ class StaffScreenAssignmentController extends Controller
         return view('admin.staff-assignments.index', compact('assignments'));
     }
 
-    /**
-     * Show create form
-     */
     public function create()
     {
-        $staff = User::role('staff')
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
+        $staff = User::role('staff')->orderBy('name')->get(['id', 'name']);
         $venues = Venue::with('screens:id,venue_id,name')
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -45,7 +35,7 @@ class StaffScreenAssignmentController extends Controller
     }
 
     /**
-     * Store assignment
+     * STORE — inline error on CREATE page
      */
     public function store(Request $request)
     {
@@ -55,7 +45,7 @@ class StaffScreenAssignmentController extends Controller
             'screen_id' => 'required|exists:screens,id',
         ]);
 
-        // Ensure user is staff
+        // Ensure staff role
         User::role('staff')->findOrFail($validated['user_id']);
 
         // Ensure screen belongs to venue
@@ -63,128 +53,28 @@ class StaffScreenAssignmentController extends Controller
             ->where('venue_id', $validated['venue_id'])
             ->firstOrFail();
 
-        DB::transaction(function () use ($validated) {
+        // Business rule: only one active assignment per staff
+        $alreadyAssigned = StaffScreenAssignment::where('user_id', $validated['user_id'])
+            ->where('active', true)
+            ->exists();
 
-            // BUSINESS RULE: only one active assignment per staff
-            $alreadyAssigned = StaffScreenAssignment::where('user_id', $validated['user_id'])
-                ->where('active', true)
-                ->lockForUpdate()
-                ->exists();
-
-            if ($alreadyAssigned) {
-                abort(422, 'This staff member is already assigned to another screen.');
-            }
-
-            // Prevent duplicate (staff + screen)
-            $duplicate = StaffScreenAssignment::where([
-                'user_id'   => $validated['user_id'],
-                'screen_id' => $validated['screen_id'],
-            ])->exists();
-
-            if ($duplicate) {
-                abort(422, 'This staff member is already assigned to this screen.');
-            }
-
-            StaffScreenAssignment::create([
-                'user_id'   => $validated['user_id'],
-                'venue_id'  => $validated['venue_id'],
-                'screen_id' => $validated['screen_id'],
-                'active'    => true,
-            ]);
-        });
-
-        return redirect()
-            ->route('admin.staff-assignments.index')
-            ->with('success', 'Staff assigned to screen successfully.');
-    }
-
-    /**
-     * Show edit form
-     */
-    public function edit(string $id)
-    {
-        $assignment = StaffScreenAssignment::with([
-            'user:id,name',
-            'venue:id,name',
-            'screen:id,name',
-        ])->findOrFail($id);
-
-        $staff = User::role('staff')->orderBy('name')->get(['id', 'name']);
-        $venues = Venue::with('screens:id,venue_id,name')
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        return view(
-            'admin.staff-assignments.edit',
-            compact('assignment', 'staff', 'venues')
-        );
-    }
-
-    /**
-     * Update assignment
-     */
-    public function update(Request $request, string $id)
-    {
-        $assignment = StaffScreenAssignment::findOrFail($id);
-
-        // AJAX toggle
-        if ($request->expectsJson()) {
-            $request->validate([
-                'active' => 'required|boolean',
-            ]);
-
-            $assignment->update([
-                'active' => $request->active,
-            ]);
-
-            return response()->json(['success' => true]);
+        if ($alreadyAssigned) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'user_id' => 'This staff member is already assigned to another screen.',
+                ]);
         }
 
-        $validated = $request->validate([
-            'user_id'   => 'required|exists:users,id',
-            'venue_id'  => 'required|exists:venues,id',
-            'screen_id' => 'required|exists:screens,id',
-            'active'    => 'required|boolean',
+        StaffScreenAssignment::create([
+            'user_id'   => $validated['user_id'],
+            'venue_id'  => $validated['venue_id'],
+            'screen_id' => $validated['screen_id'],
+            'active'    => true,
         ]);
 
-        User::role('staff')->findOrFail($validated['user_id']);
-
-        Screen::where('id', $validated['screen_id'])
-            ->where('venue_id', $validated['venue_id'])
-            ->firstOrFail();
-
-        DB::transaction(function () use ($assignment, $validated) {
-
-            if ($validated['active']) {
-                $conflict = StaffScreenAssignment::where('user_id', $validated['user_id'])
-                    ->where('id', '!=', $assignment->id)
-                    ->where('active', true)
-                    ->lockForUpdate()
-                    ->exists();
-
-                if ($conflict) {
-                    abort(422, 'This staff member is already assigned to another screen.');
-                }
-            }
-
-            $assignment->update($validated);
-        });
-
-        return redirect()
-            ->route('admin.staff-assignments.index')
-            ->with('success', 'Assignment updated successfully.');
+        return redirect()->route('admin.staff-assignments.index');
     }
 
-    /**
-     * Revoke assignment
-     */
-    public function destroy(string $id)
-    {
-        StaffScreenAssignment::findOrFail($id)
-            ->update(['active' => false]);
-
-        return redirect()
-            ->route('admin.staff-assignments.index')
-            ->with('success', 'Assignment revoked successfully.');
-    }
+    
 }

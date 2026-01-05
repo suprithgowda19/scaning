@@ -1,15 +1,13 @@
 @extends('layouts.master')
 
 @section('title', 'Assign Screen')
-@section('page_title', 'Assign Screen to Staff')
+@section('page_title', 'Assign Staff → Screen')
 
 @section('breadcrumb')
     <li class="breadcrumb-item">
-        <a href="{{ route('admin.staff-assignments.index') }}">
-            Staff Assignments
-        </a>
+        <a href="{{ route('admin.staff-assignments.index') }}">Staff Assignments</a>
     </li>
-    <li class="breadcrumb-item active">Assign Screen</li>
+    <li class="breadcrumb-item active">Assign</li>
 @endsection
 
 @push('css')
@@ -26,13 +24,12 @@
 
 <div class="card">
     <div class="card-header">
-        <h5 class="mb-0">Assign Screen</h5>
+        <h5 class="mb-0">Assign Staff to Screen</h5>
     </div>
 
     <div class="card-body">
         <form method="POST"
-              action="{{ route('admin.staff-assignments.store') }}"
-              id="assignForm">
+              action="{{ route('admin.staff-assignments.store') }}">
             @csrf
 
             <div class="row g-3">
@@ -40,11 +37,9 @@
                 {{-- STAFF --}}
                 <div class="col-md-4">
                     <label class="form-label form-section-title">Staff</label>
-                    <select name="user_id"
-                            class="form-select @error('user_id') is-invalid @enderror"
-                            required>
+                    <select name="user_id" class="form-select" required>
                         <option value="">Select Staff</option>
-                        @foreach($staff as $user)
+                        @foreach ($staff as $user)
                             <option value="{{ $user->id }}"
                                 {{ old('user_id') == $user->id ? 'selected' : '' }}>
                                 {{ $user->name }}
@@ -52,19 +47,16 @@
                         @endforeach
                     </select>
                     @error('user_id')
-                        <div class="invalid-feedback">{{ $message }}</div>
+                        <small class="text-danger">{{ $message }}</small>
                     @enderror
                 </div>
 
                 {{-- VENUE --}}
                 <div class="col-md-4">
                     <label class="form-label form-section-title">Venue</label>
-                    <select id="venue"
-                            name="venue_id"
-                            class="form-select @error('venue_id') is-invalid @enderror"
-                            required>
+                    <select id="venue" name="venue_id" class="form-select" required>
                         <option value="">Select Venue</option>
-                        @foreach($venues as $venue)
+                        @foreach ($venues as $venue)
                             <option value="{{ $venue->id }}"
                                 {{ old('venue_id') == $venue->id ? 'selected' : '' }}>
                                 {{ $venue->name }}
@@ -72,21 +64,18 @@
                         @endforeach
                     </select>
                     @error('venue_id')
-                        <div class="invalid-feedback">{{ $message }}</div>
+                        <small class="text-danger">{{ $message }}</small>
                     @enderror
                 </div>
 
                 {{-- SCREEN --}}
                 <div class="col-md-4">
                     <label class="form-label form-section-title">Screen</label>
-                    <select id="screen"
-                            name="screen_id"
-                            class="form-select @error('screen_id') is-invalid @enderror"
-                            required>
+                    <select id="screen" name="screen_id" class="form-select" required>
                         <option value="">Select Screen</option>
                     </select>
                     @error('screen_id')
-                        <div class="invalid-feedback">{{ $message }}</div>
+                        <small class="text-danger">{{ $message }}</small>
                     @enderror
                 </div>
 
@@ -98,9 +87,7 @@
                     Back
                 </a>
 
-                <button type="submit"
-                        class="btn btn-primary"
-                        id="submitBtn">
+                <button type="submit" class="btn btn-primary">
                     Assign Screen
                 </button>
             </div>
@@ -118,38 +105,39 @@ document.addEventListener('DOMContentLoaded', function () {
     const venues = @json($venues);
     const venueSelect  = document.getElementById('venue');
     const screenSelect = document.getElementById('screen');
-    const submitBtn    = document.getElementById('submitBtn');
 
-    function loadScreens() {
-        const venueId = venueSelect.value;
+    // 🔑 Values restored after validation failure
+    const selectedVenueId  = "{{ old('venue_id') }}";
+    const selectedScreenId = "{{ old('screen_id') }}";
+
+    function loadScreens(restoreSelected = false) {
         screenSelect.innerHTML = '<option value="">Select Screen</option>';
 
-        if (!venueId) return;
-
-        const venue = venues.find(v => v.id == venueId);
+        const venue = venues.find(v => v.id == venueSelect.value);
         if (!venue || !venue.screens) return;
 
         venue.screens.forEach(screen => {
-            if (screen.status && screen.status !== 'active') return;
-
             const option = document.createElement('option');
             option.value = screen.id;
             option.textContent = screen.name;
             screenSelect.appendChild(option);
         });
 
-        @if(old('screen_id'))
-            screenSelect.value = "{{ old('screen_id') }}";
-        @endif
+        // Restore previously selected screen
+        if (restoreSelected && selectedScreenId) {
+            screenSelect.value = selectedScreenId;
+        }
     }
 
-    venueSelect.addEventListener('change', loadScreens);
-    loadScreens();
+    venueSelect.addEventListener('change', function () {
+        loadScreens(false);
+    });
 
-    document.getElementById('assignForm')
-        .addEventListener('submit', function () {
-            submitBtn.disabled = true;
-        });
+    // 🔑 Auto-run on page load if validation failed
+    if (selectedVenueId) {
+        venueSelect.value = selectedVenueId;
+        loadScreens(true);
+    }
 });
 </script>
 @endpush

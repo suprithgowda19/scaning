@@ -2,77 +2,53 @@
 
 namespace App\Exports;
 
-use Illuminate\Database\Eloquent\Builder;
-use Maatwebsite\Excel\Concerns\FromQuery;
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
-
-class StaffScanLogsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
+class StaffScanLogsExport implements
+    FromCollection,
+    WithHeadings,
+    WithMapping,
+    ShouldAutoSize
 {
-    protected Builder $query;
+    protected Collection $logs;
 
-    /**
-     * Inject filtered query
-     * Eager load delegate to avoid N+1
-     */
-    public function __construct(Builder $query)
+    public function __construct(Collection $logs)
     {
-        $this->query = $query->with('delegate');
+        $this->logs = $logs;
     }
 
-    /**
-     * Base query
-     */
-    public function query(): Builder
+    public function collection(): Collection
     {
-        return $this->query;
+        return $this->logs;
     }
 
-    /**
-     * Excel column headings
-     */
     public function headings(): array
     {
         return [
-            'Scan ID',
+            '#',
             'Form No',
-            'Delegate Name',
-            'Mobile Number',
-            'UUID',
-            'Category',
-            'Status',
-            'Screen ID',
+            'Name',
+            'Phone',
+            'Movie',
+            'Slot',
             'Scanned At',
-            'Record Created At',
         ];
     }
 
-    /**
-     * Map each row to Excel
-     */
     public function map($log): array
     {
-        $delegate = $log->delegate;
-
         return [
             $log->id,
-            $log->form_no,
-
-            // Delegate info
-            $delegate
-                ? trim($delegate->firstname . ' ' . $delegate->lastname)
-                : '-',
-
-            $delegate->phone ?? '-',
-
-            $log->uuid,
-            $log->category,
-            strtoupper($log->status),
-            $log->screen_id,
-            optional($log->scanned_at)->format('Y-m-d H:i:s'),
-            optional($log->created_at)->format('Y-m-d H:i:s'),
+            $log->form_no ?? '',
+            trim(($log->delegate->firstname ?? '') . ' ' . ($log->delegate->lastname ?? '')),
+            $log->delegate->phone ?? '',
+            $log->scheduler->movie_title ?? '',
+            'Slot ' . $log->slot_no,
+            $log->scanned_at,
         ];
     }
 }

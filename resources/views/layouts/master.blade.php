@@ -8,6 +8,9 @@
     <meta name="description" content="Zeta admin dashboard">
     <meta name="author" content="pixelstrap">
 
+    {{-- ✅ CRITICAL FIX: Added CSRF Token Meta Tag --}}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
     {{-- Favicon --}}
     <link rel="icon" href="{{ asset('assets/images/biffeslogo2.png') }}" type="image/x-icon">
     <link rel="shortcut icon" href="{{ asset('assets/images/biffeslogo2.png') }}" type="image/x-icon">

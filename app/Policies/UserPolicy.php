@@ -3,20 +3,27 @@
 namespace App\Policies;
 
 use App\Models\User;
-
 class UserPolicy
 {
-    /**
-     * Admin can view any user.
-     * Staff can view only their own account.
-     */
-    public function view(User $authUser, User $targetUser): bool
+    
+    public function view(User $auth, User $target): bool
     {
-        if ($authUser->hasRole('admin')) {
-            return true;
-        }
+        return $auth->hasRole('admin')
+            || $auth->id === $target->id;
+    }
 
-        // staff → only self
-        return $authUser->id === $targetUser->id;
+    public function viewAny(User $auth): bool
+    {
+        return $auth->hasRole('admin');
+    }
+
+    public function update(User $auth, User $target): bool
+    {
+        return $auth->hasRole('admin');
+    }
+
+    public function delete(User $auth, User $target): bool
+    {
+        return $auth->hasRole('admin');
     }
 }

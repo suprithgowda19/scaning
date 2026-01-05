@@ -21,6 +21,9 @@ class AdminDashboardController extends Controller
             'screens' => Screen::orderBy('name')->get(['id', 'name']),
             'movies'  => Scheduler::distinct()->orderBy('movie_title')->pluck('movie_title'),
             'dates'   => Scheduler::distinct()->orderBy('show_date')->pluck('show_date'),
+
+            // ❌ Do NOT preload slots here
+            'slots'   => [],
         ]);
     }
 
@@ -35,27 +38,39 @@ class AdminDashboardController extends Controller
             'screen:id,name',
         ]);
 
+        // ============================
+        // Date filter
+        // ============================
         if ($request->filled('show_date')) {
             $query->whereHas('scheduler', fn ($q) =>
                 $q->whereDate('show_date', $request->show_date)
             );
         }
 
+        // ============================
+        // Screen filter
+        // ============================
         if ($request->filled('screen_id')) {
             $query->whereHas('scheduler', fn ($q) =>
                 $q->where('screen_id', $request->screen_id)
             );
         }
 
+        // ============================
+        // Movie filter
+        // ============================
         if ($request->filled('movie_title')) {
             $query->whereHas('scheduler', fn ($q) =>
                 $q->where('movie_title', $request->movie_title)
             );
         }
 
+        // ============================
+        // SLOT FILTER (DEPENDENT)
+        // ============================
         if ($request->filled('slot_no')) {
             $schedulerIds = SlotResolver::schedulerIdsForSlot(
-                $request->show_date,
+                $request->show_date,               // date FIRST
                 (int) $request->slot_no,
                 $request->screen_id
             );
@@ -65,18 +80,23 @@ class AdminDashboardController extends Controller
                 : $query->whereRaw('1=0');
         }
 
+        // ============================
+        // FETCH LOGS
+        // ============================
         $logs = $query
             ->orderByDesc('scanned_at')
             ->limit(3000)
             ->get()
             ->map(function ($log) {
-                // 🔥 ATTACH SLOT NUMBER PER ROW
                 $log->slot_no = SlotResolver::slotNoForScheduler($log->scheduler);
                 return $log;
-            });
+            })
+            ->values();
 
         return response()->json([
             'logs'  => $logs,
+
+            // ✅ Slots DEPEND on date + screen
             'slots' => SlotResolver::slotsForUI(
                 $request->show_date,
                 $request->screen_id
@@ -89,7 +109,7 @@ class AdminDashboardController extends Controller
         abort_unless(auth()->user()?->hasRole('admin'), 403);
 
         return Excel::download(
-            new AdminScanLogsExport($request->all()),
+            new AdminScanLogsExport($request),
             'admin_scan_reports.xlsx'
         );
     }

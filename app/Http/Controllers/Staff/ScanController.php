@@ -12,15 +12,12 @@ use Illuminate\Support\Carbon;
 
 class ScanController extends Controller
 {
-    /* ==========================================================
-     | DASHBOARD
-     ========================================================== */
+
     public function index()
     {
         $staff = auth()->user();
         abort_unless($staff, 401);
 
-        // Resolve active screen (1 staff → 1 screen)
         $screen = $staff->screens()
             ->wherePivot('active', true)
             ->firstOrFail();
@@ -49,10 +46,6 @@ class ScanController extends Controller
             ],
         ]);
     }
-
-    /* ==========================================================
-     | SCAN ACTION
-     ========================================================== */
     public function scan(Request $request)
     {
         $request->validate([
@@ -75,16 +68,16 @@ class ScanController extends Controller
         }
 
         /* ------------------------------
-         | Normalize input
-         ------------------------------*/
+     | Normalize input
+     ------------------------------*/
         $raw = trim($request->uuid);
+        $value = preg_match('/([a-f0-9-]{36})/i', $raw, $m)
+            ? strtoupper($m[1])
+            : strtoupper($raw);
 
-        if (preg_match('/([a-f0-9-]{36})/i', $raw, $m)) {
-            $value = strtoupper($m[1]);
-        } else {
-            $value = strtoupper($raw);
-        }
-
+        /* ------------------------------
+     | Delegate lookup
+     ------------------------------*/
         $delegate = DelegateForm::query()
             ->whereRaw('UPPER(uuid) = ?', [$value])
             ->orWhereRaw('UPPER(form_no) = ?', [$value])
@@ -97,17 +90,24 @@ class ScanController extends Controller
             ]);
         }
 
-        // Capacity check
-        if (
-            ScanLog::where('scheduler_id', $scheduler->id)->count()
-            >= $screen->capacity
-        ) {
+        /* ------------------------------
+     | Base query (REUSED)
+     ------------------------------*/
+        $scanBase = ScanLog::where('scheduler_id', $scheduler->id);
+
+        /* ------------------------------
+     | Capacity check
+     ------------------------------*/
+        if ($scanBase->count() >= $screen->capacity) {
             return response()->json([
                 'status'  => 'rejected',
                 'message' => 'Screen capacity full',
             ], 403);
         }
 
+        /* ------------------------------
+     | Insert scan
+     ------------------------------*/
         try {
             ScanLog::create([
                 'scheduler_id'     => $scheduler->id,
@@ -130,8 +130,8 @@ class ScanController extends Controller
         }
 
         /* ------------------------------
-         | Recalculate stats AFTER insert
-         ------------------------------*/
+     | Stats (single query)
+     ------------------------------*/
         $categories = ScanLog::where('scheduler_id', $scheduler->id)
             ->selectRaw('category, COUNT(*) as count')
             ->groupBy('category')
@@ -160,9 +160,6 @@ class ScanController extends Controller
         ]);
     }
 
-    /* ==========================================================
-     | ACTIVE SCHEDULER (TIME WINDOW)
-     ========================================================== */
     private function resolveActiveScheduler(int $screenId): ?Scheduler
     {
         $now = now();

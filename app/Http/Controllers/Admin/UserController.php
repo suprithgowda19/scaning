@@ -8,17 +8,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Validation\ValidationException;
-
 
 class UserController extends Controller
 {
     use AuthorizesRequests;
+
     /**
-     * Display a listing of users.
+     * ============================
+     * INDEX — ADMIN ONLY (policy)
+     * ============================
      */
     public function index()
     {
+        $this->authorize('viewAny', User::class);
+
         $users = User::with('roles')
             ->orderBy('name')
             ->get();
@@ -27,18 +30,24 @@ class UserController extends Controller
     }
 
     /**
-     * Show the form for creating a new user.
+     * ============================
+     * CREATE — ADMIN ONLY (policy)
+     * ============================
      */
     public function create()
     {
+        $this->authorize('viewAny', User::class);
+
         return view('admin.users.create');
     }
 
     /**
-     * Store a newly created user.
+     * STORE — ADMIN ONLY (policy)
      */
     public function store(Request $request)
     {
+        $this->authorize('viewAny', User::class);
+
         $validated = $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
@@ -46,7 +55,6 @@ class UserController extends Controller
         ]);
 
         DB::transaction(function () use ($validated) {
-
             $user = User::create([
                 'name'     => $validated['name'],
                 'email'    => $validated['email'],
@@ -54,17 +62,17 @@ class UserController extends Controller
                 'active'   => true,
             ]);
 
-            // Default role
+            // default role
             $user->assignRole('staff');
         });
 
-        return redirect()
-            ->route('admin.users.index')
-            ->with('success', 'User created successfully.');
+        return redirect()->route('admin.users.index');
     }
 
     /**
-     * Display the specified user.
+     * ============================
+     * SHOW — ADMIN ANY | STAFF SELF (policy)
+     * ============================
      */
     public function show(User $user)
     {
@@ -80,18 +88,24 @@ class UserController extends Controller
     }
 
     /**
-     * Show the form for editing the specified user.
+     * ============================
+     * EDIT — ADMIN ONLY (policy)
+     * ============================
      */
     public function edit(User $user)
     {
+        $this->authorize('update', $user);
+
         return view('admin.users.edit', compact('user'));
     }
 
     /**
-     * Update the specified user.
+     * UPDATE — ADMIN ONLY (policy)
      */
     public function update(Request $request, User $user)
     {
+        $this->authorize('update', $user);
+
         $validated = $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email,' . $user->id,
@@ -112,83 +126,68 @@ class UserController extends Controller
             $user->update($data);
         });
 
-        return redirect()
-            ->route('admin.users.index')
-            ->with('success', 'User updated successfully.');
+        return redirect()->route('admin.users.index');
     }
 
     /**
-     * Deactivate user (soft disable).
+     * ============================
+     * DELETE — ADMIN ONLY (policy)
+     * ============================
      */
     public function destroy(User $user)
     {
+        $this->authorize('delete', $user);
+
         if (auth()->id() === $user->id) {
-            abort(403, 'You cannot deactivate your own account.');
+            return back()->withErrors([
+                'user' => 'You cannot deactivate your own account.',
+            ]);
         }
 
-        // SAFETY: prevent locking out the last admin
-        if ($user->hasRole('admin') && User::role('admin')->where('active', true)->count() <= 1) {
-            throw ValidationException::withMessages([
+        // prevent last admin lockout
+        if (
+            $user->hasRole('admin') &&
+            User::role('admin')->where('active', true)->count() <= 1
+        ) {
+            return back()->withErrors([
                 'user' => 'You cannot deactivate the last active admin.',
             ]);
         }
 
         $user->update(['active' => false]);
 
-        return redirect()
-            ->route('admin.users.index')
-            ->with('success', 'User deactivated successfully.');
+        return redirect()->route('admin.users.index');
     }
 
     /**
-     * Toggle active/inactive status (AJAX).
+     * ============================
+     * TOGGLE STATUS — ADMIN ONLY (policy)
+     * ============================
      */
     public function toggleStatus(Request $request)
     {
+        $this->authorize('viewAny', User::class);
+
         $validated = $request->validate([
             'id'     => 'required|exists:users,id',
             'active' => 'required|boolean',
         ]);
 
-        if ((int) $validated['id'] === auth()->id()) {
+        $user = User::lockForUpdate()->findOrFail($validated['id']);
+
+        if (
+            $user->hasRole('admin') &&
+            ! $validated['active'] &&
+            User::role('admin')->where('active', true)->count() <= 1
+        ) {
             return response()->json([
                 'success' => false,
-                'message' => 'You cannot change your own status.',
-            ], 403);
+                'message' => 'Cannot deactivate the last active admin.',
+            ], 422);
         }
 
-        return DB::transaction(function () use ($validated) {
+        $user->update(['active' => $validated['active']]);
 
-            $user = User::lockForUpdate()->findOrFail($validated['id']);
-
-            // Prevent last admin lockout
-            if (
-                $user->hasRole('admin') &&
-                ! $validated['active'] &&
-                User::role('admin')->where('active', true)->count() <= 1
-            ) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot deactivate the last active admin.',
-                ], 422);
-            }
-
-            $user->update(['active' => $validated['active']]);
-
-            return response()->json([
-                'success' => true,
-                'message' => $validated['active']
-                    ? 'User activated successfully.'
-                    : 'User deactivated successfully.',
-            ]);
-        });
-    }
-    public function profile()
-    {
-        $user = auth()->user();
-
-        $this->authorize('view', $user);
-
-        return redirect()->route('admin.users.show', $user);
+        return response()->json(['success' => true]);
     }
 }

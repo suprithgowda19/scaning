@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Scheduler;
+use App\Models\Screen;
 use App\Services\SchedulerImportService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -20,32 +21,58 @@ class SchedulerExcelImport implements ToCollection, WithHeadingRow
     protected int $updated = 0;
     protected int $failed  = 0;
 
+    /**
+     * Map of Normalized Screen Name => Screen ID
+     * Example: ['audi 1' => 5, 'gold class' => 8]
+     */
+    protected array $screenMap = [];
+
     public function __construct()
     {
         $this->service = app(SchedulerImportService::class);
+        
+        // 1️⃣ PRE-LOAD & NORMALIZE SCREENS
+        // We load all screens once to handle case-insensitivity & spacing efficiently
+        $this->loadScreenMap();
     }
 
-    /**
-     * Excel rows handler
-     */
+    protected function loadScreenMap(): void
+    {
+        // Fetch ID and Name only
+        $screens = Screen::all(['id', 'name']);
+
+        foreach ($screens as $screen) {
+            // Normalize DB Name: Lowercase, Trim, Single Spaces
+            $cleanName = $this->cleanString($screen->name);
+            $this->screenMap[$cleanName] = $screen->id;
+        }
+    }
+
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
             try {
-                // 1️⃣ Normalize raw Excel row
+                // 2️⃣ Normalize Excel Data
                 $data = $this->normalizeRow($row->toArray());
 
-                // 2️⃣ Validate Excel syntax & format
+                // 3️⃣ MAP SCREEN NAME -> SCREEN ID
+                // Check if the normalized name exists in our pre-loaded map
+                $cleanScreenName = $this->cleanString($data['screen_name'] ?? '');
+                
+                if (isset($this->screenMap[$cleanScreenName])) {
+                    $data['screen_id'] = $this->screenMap[$cleanScreenName];
+                } else {
+                    // Throw specific error if screen doesn't exist
+                    throw new \Exception("Screen '{$data['screen_name']}' not found in database.");
+                }
+
+                // 4️⃣ Validate (Now checking screen_id presence)
                 $this->validateRow($data);
 
-                // 3️⃣ Decide create vs update (idempotent import)
+                // 5️⃣ Check for Existing Show (using screen_id)
                 $existing = Scheduler::where('show_date', $data['show_date'])
                     ->where('start_time', $data['start_time'])
-                    ->whereHas('screen', function ($q) use ($data) {
-                        $q->whereRaw('LOWER(name) = ?', [
-                            strtolower($data['screen_name']),
-                        ]);
-                    })
+                    ->where('screen_id', $data['screen_id']) 
                     ->first();
 
                 if ($existing) {
@@ -58,77 +85,73 @@ class SchedulerExcelImport implements ToCollection, WithHeadingRow
 
             } catch (\Throwable $e) {
                 $this->failed++;
-
-                Log::error('Scheduler Excel import failed', [
-                    'row_number' => $index + 2, // header + 1-based index
-                    'error'      => $e->getMessage(),
-                    'row_data'   => $row->toArray(),
+                Log::error('Scheduler Import Error', [
+                    'row' => $index + 2,
+                    'msg' => $e->getMessage(),
+                    'data' => $row->toArray()
                 ]);
             }
         }
     }
 
-    /* ======================================================
-     | NORMALIZATION (Excel quirks handled here)
-     ====================================================== */
+    /**
+     * Standardizer for Name Comparison
+     * "  Audi   1 " -> "audi 1"
+     */
+    protected function cleanString(?string $text): string
+    {
+        if (!$text) return '';
+        // Lowercase -> Trim -> Replace multiple spaces with single space
+        return strtolower(trim(preg_replace('/\s+/', ' ', $text)));
+    }
 
     protected function normalizeRow(array $row): array
     {
         $normalized = [];
 
         foreach ($row as $key => $value) {
-
-            // Normalize header: case + spaces
             $key = strtolower(trim($key));
             $key = str_replace(' ', '_', $key);
 
-            // Excel numeric date / time handling
-            if (is_numeric($value)) {
+            // Column Mapping
+            if ($key === 'movie_titl') $key = 'movie_title';
+            if ($key === 'event_titl') $key = 'event_title';
 
+            // Date/Time Parsing
+            if (is_numeric($value)) {
                 if ($key === 'show_date') {
-                    $normalized[$key] = ExcelDate::excelToDateTimeObject($value)
-                        ->format('Y-m-d');
+                    $normalized[$key] = ExcelDate::excelToDateTimeObject($value)->format('Y-m-d');
                     continue;
                 }
-
                 if ($key === 'start_time') {
-                    $normalized[$key] = ExcelDate::excelToDateTimeObject($value)
-                        ->format('H:i');
+                    $normalized[$key] = ExcelDate::excelToDateTimeObject($value)->format('H:i');
                     continue;
                 }
             }
 
-            // String normalization (trim + collapse spaces)
+            // String Cleanup
             if (is_string($value)) {
                 $value = trim($value);
                 $value = preg_replace('/\s+/', ' ', $value);
-
                 $normalized[$key] = $value === '' ? null : $value;
                 continue;
             }
 
             $normalized[$key] = $value;
         }
-
         return $normalized;
     }
-
-    /* ======================================================
-     | ROW VALIDATION (STRICT)
-     ====================================================== */
 
     protected function validateRow(array $data): void
     {
         $validator = Validator::make($data, [
-            'screen_name' => ['required', 'string'],
-            'venue_name'  => ['nullable', 'string'],
-
+            // Ensure ID was mapped successfully
+            'screen_id'   => ['required', 'integer', 'exists:screens,id'], 
+            
             'show_date'   => ['required', 'date'],
             'start_time'  => ['required', 'date_format:H:i'],
-
-            'movie_title' => ['nullable', 'string'],
-            'event_title' => ['nullable', 'string'],
-
+            'movie_title' => ['required_without:event_title', 'nullable', 'string'],
+            'event_title' => ['required_without:movie_title', 'nullable', 'string'],
             'language'    => ['nullable', 'string'],
             'duration'    => ['nullable', 'integer', 'min:1'],
         ]);
@@ -137,10 +160,6 @@ class SchedulerExcelImport implements ToCollection, WithHeadingRow
             throw new ValidationException($validator);
         }
     }
-
-    /* ======================================================
-     | IMPORT SUMMARY
-     ====================================================== */
 
     public function getSummary(): array
     {
