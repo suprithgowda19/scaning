@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Dashboard;
+namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Models\ScanLog;
@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\StaffScanLogsExport;
 
-class StaffDashboardController extends Controller
+class StaffReportController extends Controller
 {
     /**
      * Initial page load
@@ -23,7 +23,7 @@ class StaffDashboardController extends Controller
         $screen = $staff->screens()->wherePivot('active', true)->first();
         abort_unless($screen, 403, 'Screen not assigned');
 
-        return view('dashboard.staff.index', [
+        return view('reports.staff.index', [
             'dates'  => Scheduler::where('screen_id', $screen->id)
                 ->distinct()
                 ->orderBy('show_date')

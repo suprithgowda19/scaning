@@ -10,16 +10,21 @@ use App\Http\Controllers\Admin\{
     SchedulerController,
     SchedulerImportController
 };
+use App\Http\Controllers\Dashboard\AdminDashboardController;
 use App\Http\Controllers\Staff\ScanController;
-use App\Http\Controllers\Dashboard\{
-    StaffDashboardController,
-    AdminDashboardController
+use App\Http\Controllers\Reports\{
+    StaffReportController,
+    AdminReportController
 };
-Route::get('/', fn() => redirect()->route('login'));
+
+Route::get('/', fn () => redirect()->route('login'));
+
 Route::get('/login', [LoginController::class, 'showLoginForm'])
     ->middleware('redirect.logged')
     ->name('login');
+
 Route::post('/login', [LoginController::class, 'login']);
+
 Route::post('/logout', [LoginController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
@@ -27,6 +32,17 @@ Route::post('/logout', [LoginController::class, 'logout'])
 Route::middleware('auth')
     ->get('/profile', [UserController::class, 'profile'])
     ->name('profile.show');
+
+
+Route::middleware(['auth', 'active.user', 'role:admin'])
+    ->prefix('dashboard/admin')
+    ->name('dashboard.admin.')
+    ->group(function () {
+        Route::get('/', [AdminDashboardController::class, 'index'])
+            ->name('index');
+    Route::get('/poll', [AdminDashboardController::class, 'poll'])->name('poll');
+    });
+
 
 Route::middleware(['auth', 'active.user', 'role:admin'])
     ->prefix('admin')
@@ -54,45 +70,53 @@ Route::middleware(['auth', 'active.user'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-
         Route::get('/users/{user}', [UserController::class, 'show'])
             ->name('users.show');
     });
+
+
 Route::middleware(['auth', 'role:staff', 'active.user'])
     ->prefix('staff')
     ->name('staff.')
     ->group(function () {
+
         Route::get('/scan', [ScanController::class, 'index'])
             ->name('scan.index');
 
         Route::post('/scan', [ScanController::class, 'scan'])
             ->name('scan.store');
     });
+
+
 Route::middleware(['auth', 'role:staff'])
-    ->prefix('dashboard/staff')
-    ->name('dashboard.staff.')
+    ->prefix('reports/staff')
+    ->name('reports.staff.')
     ->group(function () {
 
-        Route::get('/', [StaffDashboardController::class, 'index'])
+        Route::get('/', [StaffReportController::class, 'index'])
             ->name('index');
-        Route::get('ajax/filter', [StaffDashboardController::class, 'ajaxFilter'])
+
+        Route::get('/ajax/filter', [StaffReportController::class, 'ajaxFilter'])
             ->name('ajax.filter');
 
-        Route::get('export/excel', [StaffDashboardController::class, 'exportExcel'])
+        Route::get('/export/excel', [StaffReportController::class, 'exportExcel'])
             ->name('export.excel');
     });
+
 Route::middleware(['auth', 'role:admin'])
-    ->prefix('dashboard/admin')
-    ->name('dashboard.admin.')
+    ->prefix('reports/admin')
+    ->name('reports.admin.')
     ->group(function () {
 
-        Route::get('/', [AdminDashboardController::class, 'index'])
+        Route::get('/', [AdminReportController::class, 'index'])
             ->name('index');
-        Route::get('/ajax/filter', [AdminDashboardController::class, 'ajaxFilter'])
+
+        Route::get('/ajax/filter', [AdminReportController::class, 'ajaxFilter'])
             ->name('ajax.filter');
-        Route::get('/screen-slots', [AdminDashboardController::class, 'screenSlots'])
+
+        Route::get('/screen-slots', [AdminReportController::class, 'screenSlots'])
             ->name('screen.slots');
 
-        Route::get('/export', [AdminDashboardController::class, 'exportExcel'])
+        Route::get('/export', [AdminReportController::class, 'exportExcel'])
             ->name('export.excel');
     });

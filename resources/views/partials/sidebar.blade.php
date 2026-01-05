@@ -38,13 +38,29 @@
                                 <i data-feather="grid"></i>
                                 <span>Dashboard</span>
                             </a>
-                        @else
-                            <a class="sidebar-link sidebar-title link-nav" href="{{ route('dashboard.staff.index') }}">
+                            @endrole
+                        @role('staff')
+                            <a class="sidebar-link sidebar-title link-nav" href="">
                                 <i data-feather="grid"></i>
                                 <span>Dashboard</span>
                             </a>
                         @endrole
                     </li>
+                      
+                    <li class="sidebar-list">
+                        @role('admin')
+                            <a class="sidebar-link sidebar-title link-nav" href="{{ route('reports.admin.index') }}">
+                                <i data-feather="bar-chart-2"></i>
+                                <span>Reports</span>
+                            </a>
+                        @else
+                            <a class="sidebar-link sidebar-title link-nav" href="{{ route('reports.staff.index') }}">
+                                <i data-feather="bar-chart-2"></i>
+                                <span>Reports</span>
+                            </a>
+                        @endrole
+                    </li>
+
                     @role('admin')
                         <li class="sidebar-list">
                             <a class="sidebar-link sidebar-title" href="javascript:void(0)">
