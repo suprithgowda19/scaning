@@ -8,7 +8,8 @@ use App\Http\Controllers\Admin\{
     UserController,
     StaffScreenAssignmentController,
     SchedulerController,
-    SchedulerImportController
+    SchedulerImportController,
+    MovieController
 };
 use App\Http\Controllers\Dashboard\AdminDashboardController;
 use App\Http\Controllers\Staff\ScanController;
@@ -17,7 +18,7 @@ use App\Http\Controllers\Reports\{
     AdminReportController
 };
 
-Route::get('/', fn () => redirect()->route('login'));
+Route::get('/', fn() => redirect()->route('login'));
 
 Route::get('/login', [LoginController::class, 'showLoginForm'])
     ->middleware('redirect.logged')
@@ -40,7 +41,7 @@ Route::middleware(['auth', 'active.user', 'role:admin'])
     ->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])
             ->name('index');
-    Route::get('/poll', [AdminDashboardController::class, 'poll'])->name('poll');
+        Route::get('/poll', [AdminDashboardController::class, 'poll'])->name('poll');
     });
 
 
@@ -65,6 +66,20 @@ Route::middleware(['auth', 'active.user', 'role:admin'])
 
         Route::resource('staff-assignments', StaffScreenAssignmentController::class);
     });
+    Route::prefix('admin')
+    ->middleware(['auth', 'role:admin'])
+    ->name('admin.')
+    ->group(function () {
+
+        Route::get('/movies',               [MovieController::class, 'index'])->name('movies.index');
+        Route::get('/movies/create',        [MovieController::class, 'create'])->name('movies.create');
+        Route::post('/movies',              [MovieController::class, 'store'])->name('movies.store');
+        Route::get('/movies/{movie}/edit',  [MovieController::class, 'edit'])->name('movies.edit');
+        Route::put('/movies/{movie}',       [MovieController::class, 'update'])->name('movies.update');
+
+        Route::post('/movies/import',       [MovieController::class, 'import'])->name('movies.import');
+    });
+
 
 Route::middleware(['auth', 'active.user'])
     ->prefix('admin')
@@ -120,3 +135,5 @@ Route::middleware(['auth', 'role:admin'])
         Route::get('/export', [AdminReportController::class, 'exportExcel'])
             ->name('export.excel');
     });
+
+    Route::view('/delegate', 'delegates.form')->name('delegates.form');

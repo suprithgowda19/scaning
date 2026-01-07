@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Venue;
 use App\Models\Screen;
 use App\Models\Scheduler;
+use App\Models\Movie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -16,20 +17,16 @@ class SchedulerImportService
 
     public function create(array $input): Scheduler
     {
-        return DB::transaction(function () use ($input) {
-            return $this->persist(new Scheduler(), $input);
-        });
+        return DB::transaction(fn () => $this->persist(new Scheduler(), $input));
     }
 
     public function update(Scheduler $scheduler, array $input): Scheduler
     {
-        return DB::transaction(function () use ($scheduler, $input) {
-            return $this->persist($scheduler, $input);
-        });
+        return DB::transaction(fn () => $this->persist($scheduler, $input));
     }
 
     /**
-     * Normalize input without DB write (used by Excel import)
+     * Used for preview / dry-run validation
      */
     public function normalizeOnly(array $input): array
     {
@@ -37,11 +34,14 @@ class SchedulerImportService
         $screen = $this->resolveScreen($venue->id, $input);
 
         $this->validateMovieOrEvent($input);
+        [$language, $duration] = $this->resolveMovieMeta($input);
         $this->validateTiming($input);
 
         return [
             'venue_id'   => $venue->id,
             'screen_id'  => $screen->id,
+            'language'   => $language,
+            'duration'   => $duration,
             'show_date'  => $input['show_date'],
             'start_time' => $input['start_time'],
         ];
@@ -57,6 +57,7 @@ class SchedulerImportService
         $screen = $this->resolveScreen($venue->id, $input);
 
         $this->validateMovieOrEvent($input);
+        [$language, $duration] = $this->resolveMovieMeta($input);
         $this->validateTiming($input);
 
         $scheduler->fill([
@@ -66,8 +67,8 @@ class SchedulerImportService
             'movie_title' => $input['movie_title'] ?? null,
             'event_title' => $input['event_title'] ?? null,
 
-            'language'    => $input['language'] ?? null,
-            'duration'    => $input['duration'] ?? null,
+            'language'    => $language,
+            'duration'    => $duration,
 
             'show_date'   => $input['show_date'],
             'start_time'  => $input['start_time'],
@@ -80,12 +81,76 @@ class SchedulerImportService
     }
 
     /* ======================================================
-     | NORMALIZATION
+     | MOVIE / EVENT LOGIC (FINAL & STRICT)
+     ====================================================== */
+
+    protected function validateMovieOrEvent(array $input): void
+    {
+        $movie = trim($input['movie_title'] ?? '');
+        $event = trim($input['event_title'] ?? '');
+
+        if ($movie === '' && $event === '') {
+            throw ValidationException::withMessages([
+                'content' => 'Either movie title or event title must be provided',
+            ]);
+        }
+
+        if ($movie !== '' && $event !== '') {
+            throw ValidationException::withMessages([
+                'content' => 'Only one of movie title or event title is allowed',
+            ]);
+        }
+    }
+
+    /**
+     * Returns [language, duration]
+     */
+    protected function resolveMovieMeta(array $input): array
+    {
+        $movieTitle = trim($input['movie_title'] ?? '');
+
+        // ===== EVENT =====
+        if ($movieTitle === '') {
+            return [
+                $input['language'] ?? null,
+                $input['duration'] ?? null,
+            ];
+        }
+
+        // ===== MOVIE (STRICT) =====
+        $normalized = $this->normalizeTitle($movieTitle);
+
+        $movie = Movie::whereRaw(
+            'LOWER(TRIM(original_title)) = ?',
+            [$normalized]
+        )->first();
+
+        if (! $movie) {
+            throw ValidationException::withMessages([
+                'movie_title' => "Movie not found in master list: {$movieTitle}",
+            ]);
+        }
+
+        return [
+            $movie->language,
+            $movie->duration ?? ($input['duration'] ?? null),
+        ];
+    }
+
+    protected function normalizeTitle(string $title): string
+    {
+        return strtolower(
+            preg_replace('/\s+/', ' ', trim($title))
+        );
+    }
+
+    /* ======================================================
+     | VENUE / SCREEN RESOLUTION
      ====================================================== */
 
     protected function resolveVenue(array $input): Venue
     {
-        if (!empty($input['venue_name'])) {
+        if (! empty($input['venue_name'])) {
             $venue = Venue::where('name', trim($input['venue_name']))->first();
 
             if (! $venue) {
@@ -131,26 +196,8 @@ class SchedulerImportService
     }
 
     /* ======================================================
-     | VALIDATION
+     | TIME VALIDATION
      ====================================================== */
-
-    protected function validateMovieOrEvent(array $input): void
-    {
-        $movie = trim($input['movie_title'] ?? '');
-        $event = trim($input['event_title'] ?? '');
-
-        if ($movie === '' && $event === '') {
-            throw ValidationException::withMessages([
-                'content' => 'Either movie title or event title must be provided',
-            ]);
-        }
-
-        if ($movie !== '' && $event !== '') {
-            throw ValidationException::withMessages([
-                'content' => 'Only one of movie title or event title is allowed',
-            ]);
-        }
-    }
 
     protected function validateTiming(array $input): void
     {

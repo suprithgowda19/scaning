@@ -38,7 +38,7 @@ class LoginController extends Controller
         }
 
         if ($user->hasRole('staff')) {
-            return redirect()->route('dashboard.staff.index');
+            return redirect()->route('reports.staff.index');
         }
 
         // 3️ Safety fallback (should never happen)

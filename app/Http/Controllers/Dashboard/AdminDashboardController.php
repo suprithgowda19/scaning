@@ -17,32 +17,54 @@ class AdminDashboardController extends Controller
         abort_unless(auth()->user()?->hasRole('admin'), 403);
 
         $today   = Carbon::today();
-        $screens = Screen::orderBy('name')->get();
+        $screens = Screen::orderBy('name')->get(['id', 'name', 'capacity']);
 
-        /* ===============================
-         | LIVE CARDS (TODAY)
-         =============================== */
-        $todaySchedulers = Scheduler::whereDate('show_date', $today)
-            ->orderBy('start_time')
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Resolve LATEST scheduler per screen (today)
+        |--------------------------------------------------------------------------
+        | This avoids "first show of the day" bug
+        */
+        $latestSchedulers = Scheduler::whereDate('show_date', $today)
+            ->select('id', 'screen_id', 'movie_title')
+            ->orderBy('start_time', 'desc')
             ->get()
-            ->groupBy('screen_id');
+            ->groupBy('screen_id')
+            ->map(fn ($group) => $group->first());
 
-        $liveCards = $screens->map(function ($screen) use ($todaySchedulers) {
-            $scheduler = $todaySchedulers[$screen->id][0] ?? null;
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Aggregate scan counts in ONE query
+        |--------------------------------------------------------------------------
+        */
+        $scanCounts = ScanLog::query()
+            ->join('schedulers', 'scan_logs.scheduler_id', '=', 'schedulers.id')
+            ->whereDate('schedulers.show_date', $today)
+            ->select('schedulers.screen_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('schedulers.screen_id')
+            ->pluck('total', 'schedulers.screen_id');
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Build live cards (NO queries inside loop)
+        |--------------------------------------------------------------------------
+        */
+        $liveCards = $screens->map(function ($screen) use ($latestSchedulers, $scanCounts) {
+            $scheduler = $latestSchedulers[$screen->id] ?? null;
 
             return [
                 'screen_name'   => $screen->name,
                 'movie_title'   => $scheduler?->movie_title ?? 'N/A',
                 'capacity'      => (int) ($screen->capacity ?? 0),
-                'scanned_count' => $scheduler
-                    ? ScanLog::where('scheduler_id', $scheduler->id)->count()
-                    : 0,
+                'scanned_count' => (int) ($scanCounts[$screen->id] ?? 0),
             ];
         });
 
-        /* ===============================
-         | FILTERS
-         =============================== */
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Analytics (filters)
+        |--------------------------------------------------------------------------
+        */
         $filterDate   = $request->input('filter_date', $today->toDateString());
         $filterScreen = $request->input('filter_screen_id');
 
@@ -54,17 +76,11 @@ class AdminDashboardController extends Controller
             $analyticsQuery->where('schedulers.screen_id', $filterScreen);
         }
 
-        /* ===============================
-         | CATEGORY STATS (DB-DRIVEN)
-         =============================== */
         $categoryStats = (clone $analyticsQuery)
             ->select('scan_logs.category', DB::raw('COUNT(*) as total'))
             ->groupBy('scan_logs.category')
             ->pluck('total', 'scan_logs.category');
 
-        /* ===============================
-         | BAR CHART — ALL SCREENS
-         =============================== */
         $screenTotals = (clone $analyticsQuery)
             ->select('schedulers.screen_id', DB::raw('COUNT(*) as total'))
             ->groupBy('schedulers.screen_id')
@@ -77,9 +93,11 @@ class AdminDashboardController extends Controller
             ];
         });
 
-        /* ===============================
-         | AJAX POLLING RESPONSE
-         =============================== */
+        /*
+        |--------------------------------------------------------------------------
+        | 5. AJAX poll response
+        |--------------------------------------------------------------------------
+        */
         if ($request->ajax()) {
             return response()->json([
                 'liveCards'     => $liveCards,
@@ -88,9 +106,6 @@ class AdminDashboardController extends Controller
             ]);
         }
 
-        /* ===============================
-         | INITIAL VIEW
-         =============================== */
         return view('dashboard.admin.index', compact(
             'liveCards',
             'screens',

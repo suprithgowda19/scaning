@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Scheduler;
 use App\Services\SchedulerImportService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class SchedulerController extends Controller
 {
@@ -16,23 +17,19 @@ class SchedulerController extends Controller
         $this->service = $service;
     }
 
-    /* ============================
-     | INDEX
-     ============================ */
+ 
 
     public function index()
     {
         $schedulers = Scheduler::with(['venue', 'screen'])
             ->orderBy('show_date')
             ->orderBy('start_time')
-            ->paginate(20);
+            ->get();
 
         return view('admin.schedulers.index', compact('schedulers'));
     }
 
-    /* ============================
-     | CREATE
-     ============================ */
+
 
     public function create()
     {
@@ -41,28 +38,35 @@ class SchedulerController extends Controller
 
     public function store(Request $request)
     {
-        // Controller validation = syntax only
         $request->validate([
             'venue_name'  => 'nullable|string',
             'screen_name' => 'required|string',
-            'movie_title' => 'nullable|string',
+
+            'movie_title' => 'required_without:event_title|string',
             'event_title' => 'nullable|string',
+
+            // Not trusted — service decides
             'language'    => 'nullable|string',
             'duration'    => 'nullable|integer|min:1',
+
             'show_date'   => 'required|date',
-            'start_time'  => 'required',
+            'start_time'  => 'required|date_format:H:i',
         ]);
 
-        $this->service->create($request->all());
+        try {
+            $this->service->create($request->all());
 
-        return redirect()
-            ->route('admin.schedulers.index')
-            ->with('success', 'Schedule created successfully');
+           
+            return redirect()->route('admin.schedulers.index');
+
+        } catch (ValidationException $e) {
+            return back()
+                ->withErrors($e->errors())
+                ->withInput();
+        }
     }
 
-    /* ============================
-     | EDIT
-     ============================ */
+   
 
     public function edit(Scheduler $scheduler)
     {
@@ -74,32 +78,42 @@ class SchedulerController extends Controller
         $request->validate([
             'venue_name'  => 'nullable|string',
             'screen_name' => 'required|string',
-            'movie_title' => 'nullable|string',
+
+            'movie_title' => 'required_without:event_title|string',
             'event_title' => 'nullable|string',
+
             'language'    => 'nullable|string',
             'duration'    => 'nullable|integer|min:1',
+
             'show_date'   => 'required|date',
-            'start_time'  => 'required',
+            'start_time'  => 'required|date_format:H:i',
             'is_active'   => 'nullable|boolean',
         ]);
 
-        $this->service->update($scheduler, $request->all());
+        try {
+            $this->service->update($scheduler, $request->all());
 
-        return redirect()
-            ->route('admin.schedulers.index')
-            ->with('success', 'Schedule updated successfully');
+            return redirect()->route('admin.schedulers.index');
+
+        } catch (ValidationException $e) {
+            return back()
+                ->withErrors($e->errors())
+                ->withInput();
+        }
     }
 
-    /* ============================
-     | DELETE
-     ============================ */
+
 
     public function destroy(Scheduler $scheduler)
     {
+        if ($scheduler->is_active) {
+            return back()->withErrors([
+                'scheduler' => 'Active schedules cannot be deleted.',
+            ]);
+        }
+
         $scheduler->delete();
 
-        return redirect()
-            ->route('admin.schedulers.index')
-            ->with('success', 'Schedule deleted successfully');
+        return redirect()->route('admin.schedulers.index');
     }
 }

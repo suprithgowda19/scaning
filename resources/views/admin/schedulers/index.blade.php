@@ -20,7 +20,6 @@
         justify-content: center;
         border-radius: 10px !important;
     }
-
     .icon-18 {
         width: 18px;
         height: 18px;
@@ -34,7 +33,7 @@
     <h4 class="mb-0"></h4>
 
     <div class="d-flex gap-2">
-        {{-- Import button (modal trigger) --}}
+        {{-- Import --}}
         <button class="btn btn-outline-primary"
                 data-bs-toggle="modal"
                 data-bs-target="#importModal">
@@ -42,7 +41,7 @@
             Import Excel
         </button>
 
-        {{-- Add schedule --}}
+        {{-- Add --}}
         <a href="{{ route('admin.schedulers.create') }}"
            class="btn btn-primary text-white">
             <i data-feather="plus-circle" class="icon-18 me-1"></i>
@@ -51,13 +50,30 @@
     </div>
 </div>
 
-{{-- Import summary --}}
+{{-- ================= ONLY MESSAGE ALLOWED ON THIS PAGE ================= --}}
 @if (session('import_summary'))
-    <div class="alert alert-info">
+    @php($s = session('import_summary'))
+
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
         <strong>Import Summary:</strong>
-        Created: {{ session('import_summary.created') }},
-        Updated: {{ session('import_summary.updated') }},
-        Failed: {{ session('import_summary.failed') }}
+        Created: {{ $s['created'] ?? 0 }},
+        Updated: {{ $s['updated'] ?? 0 }},
+        Skipped: {{ $s['skipped'] ?? 0 }},
+        Errors: {{ $s['errors'] ?? 0 }}
+
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+{{-- ==================================================================== --}}
+
+{{-- Validation / delete errors (ONLY real errors) --}}
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
     </div>
 @endif
 
@@ -80,37 +96,28 @@
             @foreach ($schedulers as $index => $scheduler)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td>{{ $scheduler->venue->name }}</td>
-                    <td>{{ $scheduler->screen->name }}</td>
-                    <td>
-                        {{ $scheduler->movie_title ?? $scheduler->event_title }}
-                    </td>
-                    <td>{{ $scheduler->show_date->format('d-m-Y') }}</td>
+                    <td>{{ optional($scheduler->venue)->name ?? '-' }}</td>
+                    <td>{{ optional($scheduler->screen)->name ?? '-' }}</td>
+                    <td>{{ $scheduler->movie_title ?? $scheduler->event_title ?? '-' }}</td>
+                    <td>{{ \Carbon\Carbon::parse($scheduler->show_date)->format('d-m-Y') }}</td>
                     <td>{{ $scheduler->start_time }}</td>
                     <td>
-                        @if($scheduler->is_active)
+                        @if ($scheduler->is_active)
                             <span class="badge bg-success">Active</span>
                         @else
                             <span class="badge bg-secondary">Inactive</span>
                         @endif
                     </td>
-
                     <td class="text-center">
                         <div class="d-flex justify-content-center gap-2">
 
-                            {{-- VIEW --}}
-                            <button class="btn btn-info btn-square"
-                                    onclick="window.location.href='{{ route('admin.schedulers.show', $scheduler->id) }}'">
-                                <i data-feather="eye" class="icon-18"></i>
-                            </button>
-
-                            {{-- EDIT --}}
+                            {{-- Edit --}}
                             <button class="btn btn-primary btn-square"
                                     onclick="window.location.href='{{ route('admin.schedulers.edit', $scheduler->id) }}'">
                                 <i data-feather="edit" class="icon-18"></i>
                             </button>
 
-                            {{-- DELETE --}}
+                            {{-- Delete --}}
                             <form action="{{ route('admin.schedulers.destroy', $scheduler->id) }}"
                                   method="POST"
                                   class="delete-form">
@@ -184,6 +191,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     $('#schedulerTable').DataTable({
         pagingType: "simple_numbers",
+        order: [[4, 'asc'], [5, 'asc']],
         language: {
             paginate: {
                 previous: "Previous",
@@ -199,10 +207,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
             Swal.fire({
                 title: "Delete Schedule?",
-                text: "This schedule will be permanently deleted.",
+                text: "Active schedules cannot be deleted.",
                 icon: "warning",
                 showCancelButton: true,
-                confirmButtonText: "Yes, delete it!"
+                confirmButtonText: "Yes, delete it"
             }).then(result => {
                 if (result.isConfirmed) {
                     form.submit();
@@ -211,16 +219,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Success toast
-    @if (session('success'))
-        Swal.fire({
-            icon: "success",
-            title: "Success",
-            text: "{{ session('success') }}",
-            timer: 1500,
-            showConfirmButton: false
-        });
-    @endif
 });
 </script>
 @endpush

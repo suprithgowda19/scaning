@@ -67,7 +67,7 @@
 </thead>
 <tbody id="table-body">
 <tr>
-    <td colspan="7" class="text-center text-muted">Loading…</td>
+    <td colspan="7" class="text-center text-muted">Select a day to view records</td>
 </tr>
 </tbody>
 </table>
@@ -87,14 +87,23 @@ const tbody    = document.getElementById('table-body');
 const exportEl = document.getElementById('exportLink');
 
 /* =========================
+   BUILD PARAMS (SAFE)
+========================= */
+function buildParams() {
+    const params = {};
+
+    if (dateEl.value)   params.show_date   = dateEl.value;
+    if (slotEl.value)   params.slot_no     = slotEl.value;
+    if (movieEl.value)  params.movie_title = movieEl.value;
+
+    return params;
+}
+
+/* =========================
    LOAD DATA
 ========================= */
 function loadData() {
-    const params = {
-        show_date: dateEl.value,
-        slot_no: slotEl.value,
-        movie_title: movieEl.value
-    };
+    const params = buildParams();
 
     exportEl.href =
         `{{ route('reports.staff.export.excel') }}?` +
@@ -113,7 +122,7 @@ function loadData() {
 }
 
 /* =========================
-   TABLE
+   TABLE RENDER
 ========================= */
 function renderTable(logs) {
     tbody.innerHTML = '';
@@ -132,7 +141,7 @@ function renderTable(logs) {
                 <td>${log.delegate?.firstname ?? ''} ${log.delegate?.lastname ?? ''}</td>
                 <td>${log.delegate?.phone ?? '-'}</td>
                 <td>${log.scheduler?.movie_title ?? '-'}</td>
-                <td>Slot ${log.slot_no}</td>
+                <td>Slot ${log.slot_no ?? '-'}</td>
                 <td>${log.scanned_at ?? '-'}</td>
             </tr>
         `);
@@ -140,7 +149,7 @@ function renderTable(logs) {
 }
 
 /* =========================
-   SLOT DROPDOWN (DATE DEP)
+   SLOT DROPDOWN (DATE-DEPENDENT)
 ========================= */
 function updateSlots(slots) {
     slotEl.innerHTML = '<option value="">All Slots</option>';
@@ -162,7 +171,7 @@ function updateSlots(slots) {
 }
 
 /* =========================
-   MOVIE DROPDOWN (DATE DEP)
+   MOVIE DROPDOWN (DATE-DEPENDENT)
 ========================= */
 function updateMovies(movies) {
     movieEl.innerHTML = '<option value="">All Movies</option>';
@@ -190,18 +199,28 @@ function resetFilters() {
     dateEl.value = '';
     slotEl.value = '';
     movieEl.value = '';
+
     slotEl.disabled = true;
     movieEl.disabled = true;
-    loadData();
+
+    exportEl.removeAttribute('href');
+
+    tbody.innerHTML =
+        `<tr><td colspan="7" class="text-center text-muted">Select a day to view records</td></tr>`;
 }
 
 /* =========================
    EVENTS
 ========================= */
-dateEl.addEventListener('change', loadData);
+dateEl.addEventListener('change', () => {
+    slotEl.value = '';
+    movieEl.value = '';
+    slotEl.disabled = true;
+    movieEl.disabled = true;
+    loadData();
+});
+
 slotEl.addEventListener('change', loadData);
 movieEl.addEventListener('change', loadData);
-
-document.addEventListener('DOMContentLoaded', loadData);
 </script>
 @endpush
