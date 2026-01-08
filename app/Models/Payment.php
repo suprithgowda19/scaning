@@ -3,40 +3,45 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-        'delegate_registration_id',
-        'gateway',
-        'order_id',
-        'payment_id',
-        'signature',
+        'delegate_id',
         'amount',
+        'currency',
         'status',
-        'gateway_payload',
+        'provider',
+        'gateway_order_id',
+        'gateway_payment_id',
+        'paid_at',
+        'failure_reason',
     ];
 
     protected $casts = [
-        'gateway_payload' => 'array',
+        'amount'  => 'integer',
+        'paid_at' => 'datetime',
     ];
 
     /**
      * Relationships
      */
-    public function registration()
+    public function delegate(): BelongsTo
     {
-        return $this->belongsTo(DelegateRegistration::class, 'delegate_registration_id');
+        return $this->belongsTo(Delegate::class);
     }
 
     /**
-     * Scopes
+     * Domain helpers (optional but clean)
      */
-    public function scopePaid($query)
+    public function isPaid(): bool
     {
-        return $query->where('status', 'paid');
+        return $this->status === 'paid';
+    }
+
+    public function isInitiated(): bool
+    {
+        return $this->status === 'initiated';
     }
 }

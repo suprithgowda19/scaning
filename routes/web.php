@@ -66,7 +66,7 @@ Route::middleware(['auth', 'active.user', 'role:admin'])
 
         Route::resource('staff-assignments', StaffScreenAssignmentController::class);
     });
-    Route::prefix('admin')
+Route::prefix('admin')
     ->middleware(['auth', 'role:admin'])
     ->name('admin.')
     ->group(function () {
@@ -136,4 +136,18 @@ Route::middleware(['auth', 'role:admin'])
             ->name('export.excel');
     });
 
-    Route::view('/delegate', 'delegates.form')->name('delegates.form');
+
+
+use App\Http\Controllers\DelegateRegistrationController;
+use App\Http\Controllers\DelegatePaymentController;
+
+
+Route::get('/delegate/register', [DelegateRegistrationController::class, 'create'])->name('delegate.register.form');
+Route::post('/delegate/register', [DelegateRegistrationController::class, 'store'])->name('delegate.store');
+
+
+Route::get('/delegate/{delegate}/payment/initiate', [DelegatePaymentController::class, 'initiate'])->name('payment.start');
+
+Route::get('/delegate/{delegate}/payment', [DelegatePaymentController::class, 'paymentPage'])->name('delegate.payment.page');
+Route::post('/delegate/{delegate}/payment/order', [DelegatePaymentController::class, 'createOrder'])->name('delegate.payment.order');
+Route::post('/delegate/{delegate}/payment/verify', [DelegatePaymentController::class, 'verify'])->name('delegate.payment.verify');
